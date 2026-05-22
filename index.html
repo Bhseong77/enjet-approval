@@ -538,11 +538,14 @@ const APPR_DRAFT_PATH = "📋 전자결재/99.Dashboard(real-time)/approval-draf
 const APPR_DOC_FOLDER = "📋 전자결재/결재문서";
 const HR_FILE_PATH = "👥 인사·총무·복지/01.인사/[인사현황] 20260507_인사관리.xlsx";
 
-const SCOPES = ["User.Read","Files.ReadWrite.All","Sites.ReadWrite.All","Chat.ReadWrite","Chat.Read","Mail.Send"];
+const SCOPES = ["User.Read","Files.ReadWrite.All","Sites.ReadWrite.All","Chat.ReadWrite","Chat.Read","Mail.Send","ApprovalSolution.ReadWrite","ApprovalSolutionResponse.ReadWrite"];
 
 // ━━ 메일 서버 (Teams 알림 백엔드) ━━
 const MAIL_API_BASE = "https://enjet-mail-api.onrender.com";
 const ENABLE_TEAMS_NOTIFICATION = true; // false로 하면 알림 끔
+
+// ━━ Teams Approvals API (Delegated 권한 방식) ━━
+const ENABLE_TEAMS_APPROVALS = true; // false로 하면 Teams Approvals 끔
 
 // ━━ 전역 상태 ━━
 let msal_, acct, spSite, spDrive;
@@ -729,6 +732,262 @@ async function notifyViaTeams(approvalId, recipientEmail, notifyType = "approval
     console.warn("Teams 알림 네트워크 오류:", e.message);
     return { error: e.message };
   }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 🎯 Teams Approvals API (Delegated 권한 직접 호출)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+// 사용자 이메일 → Microsoft User ID 캐싱
+const userIdCache = {};
+
+async function getMSUserId(email) {
+  if (!email) return null;
+  const key = email.toLowerCase();
+  if (userIdCache[key]) return userIdCache[key];
+  
+  try {
+    const token = await getToken();
+    const r = await fetch(
+      `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(email)}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    if (!r.ok) {
+      console.warn(`User ID 조회 실패 (${email}):`, r.status);
+      return null;
+    }
+    const user = await r.json();
+    userIdCache[key] = user.id;
+    return user.id;
+  } catch (e) {
+    console.warn(`User ID 조회 오류 (${email}):`, e.message);
+    return null;
+  }
+}
+
+// 결재 정보를 Teams Approval 설명 텍스트로 변환
+function buildApprovalDescription(approval) {
+  const d = approval.formData || {};
+  let desc = `📋 기안자: ${approval.drafter.name} ${approval.drafter.rank} (${approval.drafter.dept})\n`;
+  desc += `📅 기안일: ${(approval.createdAt || "").substring(0, 10)}\n`;
+  desc += `🔖 문서번호: ${approval.id}\n\n`;
+  
+  const formId = approval.formId;
+  if (formId === "VACATION") {
+    desc += `🌴 휴가 종류: ${d.vacationType || "-"}\n`;
+    desc += `📆 기간: ${d.startDate} ~ ${d.endDate} (${d.days || "-"}일)\n`;
+    if (d.vacationType === "반차") {
+      desc += `⏰ 반차 시간대: ${d.halfStart} ~ ${d.halfEnd}\n`;
+    }
+    desc += `📝 사유: ${d.reason || "-"}`;
+  } else if (formId === "EXPENSE") {
+    desc += `💵 지출 구분: ${d.expenseType || "-"}\n`;
+    desc += `💰 금액: ${fmtMoney(d.amount)} 원\n`;
+    desc += `🏢 거래처: ${d.vendor || "-"}\n`;
+    desc += `💳 결제방법: ${d.payMethod || "-"}\n`;
+    desc += `📝 사유: ${d.reason || "-"}`;
+  } else if (formId === "PURCHASE_REQUEST") {
+    desc += `🛒 프로젝트: ${d.pjCode || "-"}\n`;
+    desc += `💰 총 금액: ${fmtMoney(d.totalAmount)} 원\n`;
+    desc += `🏢 거래처: ${d.vendor || "-"}\n`;
+    desc += `📅 필요시점: ${d.dueDate || "-"}\n`;
+    desc += `📝 구매 사유: ${d.reason || "-"}`;
+  } else if (formId === "QUOTE_APPROVAL") {
+    desc += `💼 고객사: ${d.customer || "-"}\n`;
+    desc += `📋 프로젝트: ${d.pjCode || "-"}\n`;
+    desc += `💰 견적 금액: ${fmtMoney(d.quoteAmount)} 원\n`;
+    desc += `📊 할인율: ${d.discount || "0"}%\n`;
+    desc += `📦 제품/서비스: ${d.items || "-"}`;
+  } else if (formId === "BIZ_TRIP") {
+    desc += `✈️ 출장 구분: ${d.tripType || "-"}\n`;
+    desc += `📍 출장지: ${d.tripLocation || "-"}\n`;
+    desc += `📆 기간: ${d.tripStart} ~ ${d.tripEnd} (${d.tripDays || "-"}일)\n`;
+    desc += `💰 예상 비용: ${fmtMoney(d.costTotal || 0)} 원\n`;
+    desc += `📝 출장 목적: ${d.tripPurpose || "-"}`;
+  } else if (formId === "BIZ_TRIP_REPORT") {
+    desc += `📍 출장지: ${d.tripLocation || "-"}\n`;
+    desc += `📆 기간: ${d.tripStart} ~ ${d.tripEnd}\n`;
+    desc += `🏢 방문처: ${(d.contact || "").substring(0, 100)}\n`;
+    desc += `📝 주요 활동: ${(d.activities || "").substring(0, 200)}\n`;
+    desc += `🎯 성과: ${(d.results || "").substring(0, 200)}`;
+  }
+  
+  // 결재라인 표시
+  desc += `\n\n━━━━━━━━━━━━━━━━━━\n📋 전체 결재라인:\n`;
+  approval.approvalLine.forEach((s, i) => {
+    let mark = "⏳";
+    if (s.status === "승인") mark = "✅";
+    else if (s.status === "반려") mark = "❌";
+    else if (i === approval.currentStep) mark = "🔔";
+    desc += `${i+1}. ${mark} ${s.name} ${s.rank} (${s.dept})\n`;
+  });
+  
+  // 참조자
+  if (approval.ccList && approval.ccList.length > 0) {
+    desc += `\n📋 참조자: ${approval.ccList.map(c => `${c.name} ${c.rank}`).join(", ")}`;
+  }
+  
+  // 상세 보기 링크
+  desc += `\n\n🔗 상세 보기:\nhttps://bhseong77.github.io/enjet-approval/?id=${approval.id}`;
+  
+  return desc;
+}
+
+// Teams Approval 생성 (현재 결재자에게)
+async function createTeamsApproval(approval, approverEmail) {
+  if (!ENABLE_TEAMS_APPROVALS) return { skipped: true };
+  
+  try {
+    // 결재자 user ID 가져오기
+    const approverId = await getMSUserId(approverEmail);
+    if (!approverId) {
+      return { error: "결재자 user ID 조회 실패" };
+    }
+    
+    // 결재자 정보
+    const approverInfo = approval.approvalLine.find(s => 
+      (s.email || "").toLowerCase() === approverEmail.toLowerCase()
+    );
+    const approverName = approverInfo?.name || "결재자";
+    
+    // 토큰
+    const token = await getToken();
+    
+    // Approval 생성 요청
+    const body = {
+      displayName: `${approval.formIcon} ${approval.title}`,
+      description: buildApprovalDescription(approval),
+      approvalType: "basic",
+      approvers: [
+        {
+          user: {
+            id: approverId,
+            displayName: approverName
+          }
+        }
+      ],
+      allowEmailNotification: true,
+      allowCancel: true
+    };
+    
+    const r = await fetch(
+      "https://graph.microsoft.com/beta/solutions/approval/approvalItems",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(body)
+      }
+    );
+    
+    if (r.ok || r.status === 202) {
+      let result = {};
+      try { result = await r.json(); } catch {}
+      console.log("✅ Teams Approval 생성:", approverEmail, result);
+      return { success: true, approvalItemId: result.id || result.value?.id, status: r.status };
+    } else {
+      const errText = await r.text();
+      let errMsg = errText;
+      try {
+        const errJson = JSON.parse(errText);
+        errMsg = errJson.error?.message || errText;
+      } catch {}
+      console.warn(`Teams Approval 생성 실패 (${r.status}):`, errMsg);
+      return { error: `${r.status}: ${errMsg.substring(0, 200)}` };
+    }
+  } catch (e) {
+    console.warn("Teams Approval 생성 예외:", e);
+    return { error: e.message };
+  }
+}
+
+// Teams Approval 완료 알림 (간단한 메시지로 결재 완료 통보)
+async function notifyApprovalComplete(approval, recipientEmail, statusType) {
+  if (!ENABLE_TEAMS_APPROVALS) return { skipped: true };
+  
+  try {
+    const approverId = await getMSUserId(recipientEmail);
+    if (!approverId) return { error: "user ID 없음" };
+    
+    const recipientInfo = approval.ccList?.find(c => 
+      (c.email || "").toLowerCase() === recipientEmail.toLowerCase()
+    ) || { name: recipientEmail.split("@")[0] };
+    
+    const iconMap = {
+      "complete": ["✅", "결재가 완료되었습니다"],
+      "rejected": ["❌", "결재가 반려되었습니다"],
+      "cc": ["📋", "참조 결재 알림"]
+    };
+    const [icon, msg] = iconMap[statusType] || ["📢", "결재 알림"];
+    
+    const desc = `${icon} ${msg}\n\n` + buildApprovalDescription(approval);
+    
+    const token = await getToken();
+    
+    // 알림용 Approval 생성 (응답 옵션은 "확인"만)
+    const body = {
+      displayName: `${icon} ${approval.formIcon} ${approval.title}`,
+      description: desc,
+      approvalType: "basic",
+      approvers: [
+        {
+          user: { id: approverId, displayName: recipientInfo.name }
+        }
+      ],
+      allowEmailNotification: true,
+      allowCancel: false,
+      responseOptions: [
+        { displayName: "확인", value: "acknowledge", language: "ko-KR" }
+      ]
+    };
+    
+    const r = await fetch(
+      "https://graph.microsoft.com/beta/solutions/approval/approvalItems",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(body)
+      }
+    );
+    
+    if (r.ok || r.status === 202) {
+      console.log("✅ 완료 알림 발송:", recipientEmail);
+      return { success: true };
+    } else {
+      const err = await r.text();
+      console.warn("완료 알림 실패:", err.substring(0, 200));
+      return { error: err.substring(0, 200) };
+    }
+  } catch (e) {
+    console.warn("완료 알림 예외:", e);
+    return { error: e.message };
+  }
+}
+
+// 통합 알림 함수: Teams Approvals + 메일 서버 백업
+async function sendApprovalNotification(approval, recipientEmail, notifyType = "approval") {
+  const results = { teams: null, mail: null };
+  
+  // 1. Teams Approvals (우선 시도)
+  if (notifyType === "approval") {
+    results.teams = await createTeamsApproval(approval, recipientEmail);
+  } else {
+    results.teams = await notifyApprovalComplete(approval, recipientEmail, notifyType);
+  }
+  
+  // 2. 메일 서버 백엔드 알림 (백업) - 실패해도 무시
+  if (ENABLE_TEAMS_NOTIFICATION) {
+    try {
+      results.mail = await notifyViaTeams(approval.id, recipientEmail, notifyType);
+    } catch (e) { /* 무시 */ }
+  }
+  
+  return results;
 }
 
 // ━━ HR Picker (참조자 선택용) ━━
@@ -2055,15 +2314,19 @@ async function submitApproval() {
       await saveDrafts();
     }
 
-    // Teams 첫 결재자에게 알림 발송
+    // Teams 첫 결재자에게 알림 발송 (Teams Approvals API + 메일 서버 백업)
     const firstApprover = composeState.approvalLine[0];
     if (firstApprover && firstApprover.email) {
       toast("Teams 알림 발송 중...", "info");
-      const notifyResult = await notifyViaTeams(composeState.id, firstApprover.email, "approval");
-      if (notifyResult.success) {
-        toast(`✅ Teams 알림 전송 완료 (${firstApprover.name} ${firstApprover.rank})`, "success");
-      } else if (notifyResult.error) {
-        toast(`⚠️ 결재는 상신되었으나 Teams 알림 실패: ${notifyResult.error.substring(0,100)}`, "warn");
+      const result = await sendApprovalNotification(composeState, firstApprover.email, "approval");
+      
+      if (result.teams?.success) {
+        toast(`✅ Teams 승인 카드 발송 완료 (${firstApprover.name} ${firstApprover.rank})`, "success");
+      } else if (result.mail?.success) {
+        toast(`📧 이메일 알림 발송 완료 (${firstApprover.name} ${firstApprover.rank})`, "success");
+      } else {
+        const errMsg = result.teams?.error || result.mail?.error || "알 수 없는 오류";
+        toast(`⚠️ 결재는 상신되었으나 알림 실패: ${errMsg.substring(0, 100)}`, "warn");
       }
     }
 
@@ -2083,12 +2346,24 @@ function openDetail(id) {
   if (!a) return;
   detailState = a;
   $("detailTitle").textContent = `${a.formIcon || "📄"} ${a.title}`;
-  $("detailBody").innerHTML = renderDetail(a);
-
+  
   const myEmail = (acct?.username || "").toLowerCase();
   const isMyTurn = a.status === "진행중" &&
                    a.approvalLine?.[a.currentStep]?.email?.toLowerCase() === myEmail &&
                    a.approvalLine?.[a.currentStep]?.status === "대기";
+
+  // 본문 렌더
+  let bodyHtml = renderDetail(a);
+  
+  // 내 차례면 Teams 안내 메시지 추가
+  if (isMyTurn) {
+    bodyHtml = `<div style="background:linear-gradient(135deg,#1a6fd4,#0f4c81);color:#fff;padding:12px 16px;border-radius:10px;margin-bottom:14px;font-size:13px;line-height:1.6">
+      <div style="font-weight:700;margin-bottom:4px">💡 Teams에서도 결재 가능</div>
+      <div style="opacity:0.95">Microsoft Teams 좌측 메뉴 ✅ <strong>승인</strong> 앱에서도 이 결재를 처리할 수 있습니다.</div>
+    </div>` + bodyHtml;
+  }
+  
+  $("detailBody").innerHTML = bodyHtml;
 
   let footHtml = `<button class="btn" onclick="closeModal('modalDetail')">닫기</button>`;
   if (isMyTurn) {
@@ -2101,6 +2376,7 @@ function openDetail(id) {
   } else if (a.drafter?.email?.toLowerCase() === myEmail && a.status === "진행중") {
     footHtml = `<button class="btn" onclick="resendTeamsNotification('${a.id}')">🔔 Teams 재알림</button><button class="btn warn" onclick="cancelApproval('${a.id}')">🚫 결재 회수</button><button class="btn" onclick="closeModal('modalDetail')">닫기</button>`;
   }
+  
   $("detailFoot").innerHTML = footHtml;
   $("modalDetail").classList.add("on");
 }
@@ -2110,19 +2386,18 @@ async function resendTeamsNotification(approvalId) {
   if (!a) return;
   const cur = a.approvalLine?.[a.currentStep];
   if (!cur) return;
-  if (!confirm(`${cur.name} ${cur.rank}님에게 Teams 알림을 다시 보낼까요?`)) return;
+  if (!confirm(`${cur.name} ${cur.rank}님에게 Teams 승인 카드를 다시 보낼까요?`)) return;
   
   toast("Teams 재알림 발송 중...", "info");
   try {
-    const r = await fetch(`${MAIL_API_BASE}/api/approval/resend`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ approvalId })
-    });
-    if (r.ok) {
-      toast(`✅ ${cur.name}님에게 Teams 알림 재발송`, "success");
+    const result = await sendApprovalNotification(a, cur.email, "approval");
+    if (result.teams?.success) {
+      toast(`✅ ${cur.name}님에게 Teams 승인 카드 재발송`, "success");
+    } else if (result.mail?.success) {
+      toast(`📧 ${cur.name}님에게 이메일 알림 재발송`, "success");
     } else {
-      toast("재알림 실패: " + r.status, "error");
+      const errMsg = result.teams?.error || result.mail?.error || "알 수 없는 오류";
+      toast("재알림 실패: " + errMsg.substring(0, 100), "error");
     }
   } catch (e) {
     toast("재알림 오류: " + e.message, "error");
@@ -2334,24 +2609,24 @@ async function doApproval(id, action) {
   try {
     await saveApprovals();
     
-    // Teams 알림 발송
+    // 통합 알림 발송 (Teams Approvals API + 메일 서버 백업)
     if (action === "반려") {
       // 기안자에게 반려 알림
-      notifyViaTeams(a.id, a.drafter.email, "rejected").catch(e => console.warn(e));
+      sendApprovalNotification(a, a.drafter.email, "rejected").catch(e => console.warn(e));
     } else if (a.status === "완료") {
       // 기안자에게 완료 알림
-      notifyViaTeams(a.id, a.drafter.email, "complete").catch(e => console.warn(e));
+      sendApprovalNotification(a, a.drafter.email, "complete").catch(e => console.warn(e));
       // 참조자에게 참조 알림
       if (a.ccList && a.ccList.length > 0) {
         a.ccList.forEach(cc => {
-          notifyViaTeams(a.id, cc.email, "cc").catch(e => console.warn(e));
+          sendApprovalNotification(a, cc.email, "cc").catch(e => console.warn(e));
         });
       }
     } else {
       // 다음 결재자에게 알림
       const nextApprover = a.approvalLine[a.currentStep];
       if (nextApprover && nextApprover.email) {
-        notifyViaTeams(a.id, nextApprover.email, "approval").catch(e => console.warn(e));
+        sendApprovalNotification(a, nextApprover.email, "approval").catch(e => console.warn(e));
       }
     }
     
