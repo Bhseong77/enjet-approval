@@ -1,0 +1,1760 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>ENJET | 전자결재</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.10.0/lib/msal-browser.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.20.3/dist/xlsx.full.min.js"></script>
+<style>
+:root{
+  --bg:#f4f6fa;--bg2:#fff;--bg3:#eef1f6;
+  --border:rgba(0,0,0,0.07);--border2:rgba(0,0,0,0.13);
+  --p:#1a6fd4;--pd:rgba(26,111,212,0.08);
+  --g:#00875a;--gd:rgba(0,135,90,0.08);
+  --a:#d95f00;--ad:rgba(217,95,0,0.08);
+  --r:#c8201e;--rd:rgba(200,32,30,0.08);
+  --y:#9a6400;--yd:rgba(154,100,0,0.09);
+  --pu:#6b35b8;--pud:rgba(107,53,184,0.08);
+  --t:#111827;--t2:#4b5563;--t3:#9ca3af;
+  --m:"JetBrains Mono",monospace;
+  --s:"Pretendard",sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:var(--s);background:var(--bg);color:var(--t);font-size:16px}
+
+/* 로그인 */
+.lm{position:fixed;inset:0;background:rgba(15,23,42,.6);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(8px)}
+.lm.hidden{display:none}
+.lbox{background:#fff;border-radius:16px;padding:38px;width:420px;max-width:90vw;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+.l-logo{font-size:28px;font-weight:900;color:var(--p);letter-spacing:3px;font-family:var(--m);margin-bottom:4px}
+.l-sub{color:var(--t3);font-size:15px;margin-bottom:20px}
+.l-desc{color:var(--t2);font-size:16px;line-height:1.6;margin-bottom:20px}
+.btn-ms{background:#2f2f2f;color:#fff;border:none;width:100%;padding:12px;font-size:17px;font-weight:600;font-family:var(--s);border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:9px}
+.btn-ms:hover{background:#111}.btn-ms:disabled{background:#999}
+.mslogo{width:20px;height:20px;background-image:linear-gradient(to right,#f25022 50%,#7fba00 50%),linear-gradient(to right,#00a4ef 50%,#ffb900 50%);background-size:100% 50%;background-repeat:no-repeat;background-position:top,bottom}
+.l-foot{margin-top:14px;font-size:14px;color:var(--t3);line-height:1.6}
+
+/* 레이아웃 */
+.layout{display:none;min-height:100vh}
+.sb{width:240px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;flex-shrink:0}
+.sb-logo{padding:18px 18px 12px;border-bottom:1px solid var(--border)}
+.sb-mark{font-size:18px;font-weight:900;color:var(--p);letter-spacing:2px;font-family:var(--m)}
+.sb-sub{font-size:13px;color:var(--t2);margin-top:2px;font-weight:600}
+.sb-sync{padding:9px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:7px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--y)}
+.dot.ok{background:var(--g)}.dot.err{background:var(--r)}
+.sb-nav{flex:1;overflow-y:auto;padding:9px 0}
+.ni{padding:9px 18px;cursor:pointer;font-size:14px;color:var(--t2);font-weight:600;display:flex;align-items:center;gap:9px;border-left:3px solid transparent;transition:all .1s}
+.ni:hover{background:var(--bg3)}
+.ni.on{background:var(--pd);color:var(--p);font-weight:700;border-left-color:var(--p)}
+.ni-badge{margin-left:auto;background:var(--p);color:#fff;font-size:11px;padding:2px 7px;border-radius:99px;font-weight:700;min-width:20px;text-align:center}
+.ni-section{padding:14px 18px 4px;font-size:11px;color:var(--t3);font-weight:700;letter-spacing:1px;text-transform:uppercase}
+.sb-foot{padding:12px 16px;border-top:1px solid var(--border);background:var(--bg3)}
+.sb-user{font-size:13px;color:var(--t);font-weight:700}
+.sb-user-sub{font-size:12px;color:var(--t3);margin-top:2px}
+
+/* 메인 */
+.main{flex:1;display:flex;flex-direction:column;min-width:0}
+.topbar{background:var(--bg2);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:50}
+.tb-title{font-size:17px;font-weight:800;color:var(--t)}
+.tb-sp{flex:1}
+.btn{padding:7px 13px;border:1px solid var(--border2);background:var(--bg2);color:var(--t);border-radius:7px;cursor:pointer;font-family:var(--s);font-size:14px;font-weight:600;transition:all .15s}
+.btn:hover{background:var(--bg3)}
+.btn.primary{background:var(--p);color:#fff;border-color:var(--p)}
+.btn.primary:hover{background:#0e5cb8}
+.btn.success{background:var(--g);color:#fff;border-color:var(--g)}
+.btn.success:hover{background:#006e48}
+.btn.danger{background:var(--r);color:#fff;border-color:var(--r)}
+.btn.danger:hover{background:#a51916}
+.btn.warn{background:var(--a);color:#fff;border-color:var(--a)}
+.btn.sm{padding:5px 9px;font-size:13px}
+.btn:disabled{opacity:0.5;cursor:not-allowed}
+
+.content{padding:20px 24px;max-width:1280px;margin:0 auto;width:100%}
+.page{display:none}
+.page.on{display:block}
+
+/* KPI */
+.kr{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px}
+.kpi{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:14px 16px;cursor:pointer;transition:all .15s}
+.kpi:hover{border-color:var(--p);transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,0.04)}
+.kpi-label{font-size:13px;color:var(--t2);font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.kpi-icon{width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:13px}
+.kpi-icon.p{background:var(--pd);color:var(--p)}
+.kpi-icon.g{background:var(--gd);color:var(--g)}
+.kpi-icon.a{background:var(--ad);color:var(--a)}
+.kpi-icon.r{background:var(--rd);color:var(--r)}
+.kpi-icon.y{background:var(--yd);color:var(--y)}
+.kpi-icon.pu{background:var(--pud);color:var(--pu)}
+.kpi-value{font-size:26px;font-weight:800;color:var(--t);font-family:var(--m)}
+.kpi-sub{font-size:12px;color:var(--t3);margin-top:3px}
+
+/* 카드 */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:14px}
+.ch{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--bg2)}
+.ct{font-size:15px;font-weight:800;display:flex;align-items:center;gap:8px}
+.ci{width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;background:var(--pd);color:var(--p)}
+.cb{padding:14px 16px}
+
+/* 테이블 */
+.tbl{width:100%;border-collapse:collapse;font-size:14px}
+.tbl th{background:var(--bg3);padding:10px 12px;text-align:left;font-weight:700;color:var(--t2);font-size:13px;border-bottom:1px solid var(--border);position:sticky;top:0}
+.tbl td{padding:10px 12px;border-bottom:1px solid var(--border);color:var(--t)}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tr.row-clk{cursor:pointer}
+.tbl tr.row-clk:hover td{background:var(--bg3)}
+.empty{padding:60px 20px;text-align:center;color:var(--t3)}
+.empty-icon{font-size:48px;margin-bottom:10px;opacity:0.4}
+
+/* 상태 뱃지 */
+.bdg{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:99px;font-size:12px;font-weight:700}
+.bdg.wait{background:var(--yd);color:var(--y)}
+.bdg.prog{background:var(--pd);color:var(--p)}
+.bdg.done{background:var(--gd);color:var(--g)}
+.bdg.rej{background:var(--rd);color:var(--r)}
+.bdg.draft{background:var(--bg3);color:var(--t2)}
+
+/* 폼 */
+.si,.ss,.ta{padding:8px 12px;border:1px solid var(--border2);border-radius:7px;font-family:var(--s);font-size:14px;background:var(--bg2);color:var(--t);width:100%}
+.ta{resize:vertical;min-height:80px;font-family:var(--s)}
+.si:focus,.ss:focus,.ta:focus{outline:none;border-color:var(--p)}
+.fg{margin-bottom:12px}
+.fl{display:block;font-size:13px;font-weight:700;color:var(--t2);margin-bottom:5px}
+.fl .req{color:var(--r);margin-left:3px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+/* 결재라인 표시 */
+.aline{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:12px;background:var(--bg3);border-radius:8px;margin-bottom:12px}
+.astep{background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:8px 12px;display:flex;flex-direction:column;align-items:center;min-width:90px;position:relative}
+.astep.curr{border-color:var(--p);background:var(--pd)}
+.astep.done{border-color:var(--g);background:var(--gd)}
+.astep.rej{border-color:var(--r);background:var(--rd)}
+.astep-name{font-size:13px;font-weight:700;color:var(--t)}
+.astep-rank{font-size:11px;color:var(--t3);margin-top:1px}
+.astep-status{font-size:10px;font-weight:700;margin-top:3px}
+.astep.curr .astep-status{color:var(--p)}
+.astep.done .astep-status{color:var(--g)}
+.astep.rej .astep-status{color:var(--r)}
+.aarr{color:var(--t3);font-size:16px}
+
+/* 모달 */
+.modal{position:fixed;inset:0;background:rgba(15,23,42,.6);z-index:10000;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px);padding:20px}
+.modal.on{display:flex}
+.mbox{background:var(--bg2);border-radius:14px;width:760px;max-width:96vw;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+.mbox.lg{width:920px}
+.mh{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.mt{font-size:17px;font-weight:800}
+.mx{background:none;border:none;font-size:22px;color:var(--t3);cursor:pointer;width:32px;height:32px;border-radius:7px}
+.mx:hover{background:var(--bg3);color:var(--t)}
+.mb{padding:18px 20px;overflow-y:auto;flex:1}
+.mf{padding:12px 20px;border-top:1px solid var(--border);background:var(--bg3);display:flex;gap:8px;justify-content:flex-end}
+
+/* 양식 선택 트리 */
+.form-tree{display:flex;gap:0;height:420px;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.form-cats{width:240px;border-right:1px solid var(--border);overflow-y:auto;background:var(--bg3)}
+.form-cat{padding:10px 14px;cursor:pointer;font-size:14px;font-weight:600;color:var(--t2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+.form-cat:hover{background:var(--bg2)}
+.form-cat.on{background:var(--bg2);color:var(--p);font-weight:800;border-left:3px solid var(--p)}
+.form-list{flex:1;overflow-y:auto;background:var(--bg2)}
+.form-item{padding:10px 16px;cursor:pointer;font-size:14px;color:var(--t);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;transition:all .1s}
+.form-item:hover{background:var(--bg3)}
+.form-item.on{background:var(--pd);color:var(--p);font-weight:700}
+.form-item.coming{opacity:0.5;cursor:not-allowed;font-style:italic}
+.form-item-icon{font-size:14px;opacity:0.7}
+.form-item-coming-tag{margin-left:auto;font-size:11px;background:var(--yd);color:var(--y);padding:2px 6px;border-radius:99px;font-weight:700}
+
+/* 결재 처리 영역 */
+.appr-info{background:var(--bg3);border-radius:8px;padding:12px;margin-bottom:12px;font-size:14px}
+.appr-info-row{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px dashed var(--border)}
+.appr-info-row:last-child{border-bottom:none}
+.appr-info-row .lbl{color:var(--t3);font-weight:600;font-size:13px}
+.appr-info-row .val{color:var(--t);font-weight:600;font-size:14px}
+
+/* HR Picker (직원 선택) */
+.hrpick-search{display:flex;gap:8px;margin-bottom:10px}
+.hrpick-list{max-height:380px;overflow-y:auto;border:1px solid var(--border);border-radius:8px}
+.hrpick-row{display:flex;align-items:center;gap:10px;padding:9px 14px;cursor:pointer;border-bottom:1px solid var(--border);transition:background .1s}
+.hrpick-row:hover{background:var(--bg3)}
+.hrpick-row:last-child{border-bottom:none}
+.hrpick-avt{width:36px;height:36px;border-radius:50%;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;flex-shrink:0}
+.hrpick-name{font-size:14px;font-weight:700;color:var(--t)}
+.hrpick-meta{font-size:12px;color:var(--t3);margin-top:1px}
+.hrpick-tag{font-size:11px;padding:2px 7px;border-radius:6px;font-weight:700}
+
+/* 양식 본문 (시뮬레이션 양식) */
+.form-paper{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:18px;margin-top:10px}
+.form-paper h3{font-size:16px;margin-bottom:14px;color:var(--p);border-bottom:2px solid var(--p);padding-bottom:6px}
+
+/* 첨부파일 */
+.atch-zone{border:1px dashed var(--border2);border-radius:8px;padding:14px;text-align:center;color:var(--t3);font-size:13px;cursor:pointer;transition:all .1s}
+.atch-zone:hover{border-color:var(--p);color:var(--p);background:var(--pd)}
+.atch-list{margin-top:8px}
+.atch-item{display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg3);border-radius:6px;margin-bottom:4px;font-size:13px}
+.atch-item-rm{margin-left:auto;cursor:pointer;color:var(--r);font-weight:700;padding:2px 6px;border-radius:4px}
+.atch-item-rm:hover{background:var(--rd)}
+
+@media (max-width:900px){
+  .sb{width:60px}
+  .sb-logo,.sb-sync,.sb-foot,.ni span:not(.ni-emoji),.ni-section,.ni-badge{display:none}
+  .ni{padding:12px;justify-content:center}
+  .ni-emoji{font-size:18px}
+  .kr{grid-template-columns:repeat(2,1fr)}
+  .row2{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- 로그인 -->
+<div class="lm" id="lm">
+  <div class="lbox">
+    <div class="l-logo">ENJET</div>
+    <div class="l-sub">전자결재 v1.0</div>
+    <div class="l-desc">
+      ENJET 임직원 전용<br>
+      Microsoft 365 계정으로 로그인
+    </div>
+    <button class="btn-ms" id="btnLogin"><div class="mslogo"></div>Microsoft 계정으로 로그인</button>
+    <div class="l-foot">
+      🔒 인사현황DB 기반 자동 결재라인<br>
+      SharePoint 06.BackOffice 자동 연동
+    </div>
+  </div>
+</div>
+
+<!-- 메인 레이아웃 -->
+<div class="layout" id="ml">
+  <!-- 사이드바 -->
+  <aside class="sb">
+    <div class="sb-logo">
+      <div class="sb-mark">ENJET</div>
+      <div class="sb-sub">전자결재</div>
+    </div>
+    <div class="sb-sync"><span class="dot" id="syncDot"></span><span id="syncTxt" style="font-size:13px;color:var(--t2)">연결 중...</span></div>
+    <nav class="sb-nav">
+      <div class="ni-section">대시보드</div>
+      <div class="ni on" data-page="home" onclick="go('home')"><span class="ni-emoji">🏠</span><span>홈</span></div>
+
+      <div class="ni-section">결재함</div>
+      <div class="ni" data-page="inbox" onclick="go('inbox')"><span class="ni-emoji">📥</span><span>받은 결재함</span><span class="ni-badge" id="badgeInbox" style="display:none">0</span></div>
+      <div class="ni" data-page="sent" onclick="go('sent')"><span class="ni-emoji">📤</span><span>보낸 결재함</span></div>
+      <div class="ni" data-page="cc" onclick="go('cc')"><span class="ni-emoji">📋</span><span>참조 결재함</span></div>
+
+      <div class="ni-section">작성</div>
+      <div class="ni" onclick="openFormPicker()"><span class="ni-emoji">✏️</span><span>새 결재 작성</span></div>
+      <div class="ni" data-page="draft" onclick="go('draft')"><span class="ni-emoji">📝</span><span>임시저장함</span></div>
+
+      <div class="ni-section">관리</div>
+      <div class="ni" data-page="org" onclick="go('org')"><span class="ni-emoji">👥</span><span>조직도</span></div>
+      <div class="ni" data-page="settings" onclick="go('settings')"><span class="ni-emoji">⚙️</span><span>설정</span></div>
+
+      <div class="ni-section">기타</div>
+      <div class="ni" onclick="window.location.href='../'"><span class="ni-emoji">🔙</span><span>메인 대시보드</span></div>
+    </nav>
+    <div class="sb-foot">
+      <div class="sb-user" id="sbUser">로그인 필요</div>
+      <div class="sb-user-sub" id="sbUserSub">-</div>
+    </div>
+  </aside>
+
+  <!-- 메인 -->
+  <main class="main">
+    <div class="topbar">
+      <div class="tb-title" id="pageTitle">홈</div>
+      <div class="tb-sp"></div>
+      <button class="btn primary" onclick="openFormPicker()">✏️ 새 결재</button>
+      <button class="btn" onclick="reloadAll()">🔄 새로고침</button>
+      <button class="btn" onclick="logout()">로그아웃</button>
+    </div>
+
+    <div class="content">
+
+      <!-- 🏠 홈 -->
+      <div class="page on" id="page-home">
+        <div class="kr">
+          <div class="kpi" onclick="go('inbox')">
+            <div class="kpi-label"><span class="kpi-icon a">📥</span>결재 대기</div>
+            <div class="kpi-value" id="kpiWait">-</div>
+            <div class="kpi-sub">내가 결재해야 할 문서</div>
+          </div>
+          <div class="kpi" onclick="go('sent')">
+            <div class="kpi-label"><span class="kpi-icon p">🔄</span>진행 중</div>
+            <div class="kpi-value" id="kpiProg">-</div>
+            <div class="kpi-sub">내가 올린 진행 중 문서</div>
+          </div>
+          <div class="kpi" onclick="go('sent')">
+            <div class="kpi-label"><span class="kpi-icon g">✅</span>이번달 완료</div>
+            <div class="kpi-value" id="kpiDone">-</div>
+            <div class="kpi-sub">이번달 승인된 문서</div>
+          </div>
+          <div class="kpi" onclick="go('sent')">
+            <div class="kpi-label"><span class="kpi-icon r">⛔</span>반려</div>
+            <div class="kpi-value" id="kpiRej">-</div>
+            <div class="kpi-sub">이번달 반려된 문서</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="ch"><div class="ct"><div class="ci">⚡</div>최근 결재 요청</div></div>
+          <div class="cb" id="recentInbox">
+            <div class="empty"><div class="empty-icon">📭</div>결재할 문서가 없습니다</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="ch"><div class="ct"><div class="ci">📊</div>최근 내 결재 진행상황</div></div>
+          <div class="cb" id="recentSent">
+            <div class="empty"><div class="empty-icon">📝</div>제출한 결재가 없습니다</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 📥 받은 결재함 -->
+      <div class="page" id="page-inbox">
+        <div class="card">
+          <div class="ch">
+            <div class="ct"><div class="ci">📥</div>받은 결재함</div>
+            <div style="display:flex;gap:6px;align-items:center">
+              <select class="ss" id="inboxFilter" onchange="renderInbox()" style="width:auto">
+                <option value="wait">결재 대기</option>
+                <option value="all">전체</option>
+                <option value="done">완료한 결재</option>
+              </select>
+            </div>
+          </div>
+          <div class="cb" id="inboxList" style="padding:0">
+            <div class="empty"><div class="empty-icon">📭</div>결재할 문서가 없습니다</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 📤 보낸 결재함 -->
+      <div class="page" id="page-sent">
+        <div class="card">
+          <div class="ch">
+            <div class="ct"><div class="ci">📤</div>보낸 결재함</div>
+            <div style="display:flex;gap:6px">
+              <select class="ss" id="sentFilter" onchange="renderSent()" style="width:auto">
+                <option value="all">전체</option>
+                <option value="진행중">진행중</option>
+                <option value="완료">완료</option>
+                <option value="반려">반려</option>
+              </select>
+            </div>
+          </div>
+          <div class="cb" id="sentList" style="padding:0">
+            <div class="empty"><div class="empty-icon">📭</div>제출한 결재가 없습니다</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 📋 참조 결재함 -->
+      <div class="page" id="page-cc">
+        <div class="card">
+          <div class="ch"><div class="ct"><div class="ci">📋</div>참조 결재함</div></div>
+          <div class="cb" id="ccList" style="padding:0">
+            <div class="empty"><div class="empty-icon">📭</div>참조 문서가 없습니다</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 📝 임시저장 -->
+      <div class="page" id="page-draft">
+        <div class="card">
+          <div class="ch"><div class="ct"><div class="ci">📝</div>임시저장함</div></div>
+          <div class="cb" id="draftList" style="padding:0">
+            <div class="empty"><div class="empty-icon">📝</div>임시저장된 문서가 없습니다</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 👥 조직도 -->
+      <div class="page" id="page-org">
+        <div class="card">
+          <div class="ch">
+            <div class="ct"><div class="ci">👥</div>조직도 (인사현황DB 자동 연동)</div>
+            <div style="font-size:13px;color:var(--t3)">엔젯 SharePoint > 인사·총무·복지 > 01.인사</div>
+          </div>
+          <div class="cb">
+            <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+              <input class="si" id="orgSearch" placeholder="🔍 이름/부서/직급 검색..." oninput="renderOrg()" style="flex:1;min-width:200px">
+              <select class="ss" id="orgDeptF" onchange="renderOrg()" style="width:auto"><option value="">전체 부서</option></select>
+            </div>
+            <div id="orgList"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ⚙️ 설정 -->
+      <div class="page" id="page-settings">
+        <div class="card">
+          <div class="ch"><div class="ct"><div class="ci">⚙️</div>설정 / 정보</div></div>
+          <div class="cb" style="font-size:14px;line-height:1.8">
+            <h3 style="font-size:15px;margin-bottom:10px">📌 데이터 위치</h3>
+            <div style="background:var(--bg3);padding:12px;border-radius:8px;font-family:var(--m);font-size:13px;margin-bottom:14px">
+              SharePoint Site: <strong>06.BackOffice</strong><br>
+              결재 저장: <strong>📋 전자결재/99.Dashboard(real-time)/</strong><br>
+              인사 데이터: <strong>👥 인사·총무·복지/01.인사/[인사현황] xxx.xlsx</strong>
+            </div>
+
+            <h3 style="font-size:15px;margin-bottom:10px">📊 결재라인 규칙</h3>
+            <div style="background:var(--bg3);padding:12px;border-radius:8px;font-size:13px;line-height:1.7">
+              <strong>휴가신청서</strong>: 직속상사 → 부서장 (2단계)<br>
+              <strong>지출결의서</strong>: 금액 분기<br>
+              &nbsp;&nbsp;• 100만원 미만: 상사 → 재무회계팀장<br>
+              &nbsp;&nbsp;• 100~500만원: 상사 → 재무회계팀장 → 본부장<br>
+              &nbsp;&nbsp;• 500만원 이상: 상사 → 재무회계팀장 → 본부장 → 대표이사<br>
+              <strong>구매품의서</strong>: 상사 → 구매감사팀장 → 본부장 (Phase 2: 구매모듈 연동)<br>
+              <strong>견적승인</strong>: 상사 → 본부장 → 대표 (Phase 2: 영업모듈 연동)
+            </div>
+
+            <h3 style="font-size:15px;margin:14px 0 10px">🔧 시스템 도구</h3>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn" onclick="reloadHR()">🔄 인사DB 재로딩</button>
+              <button class="btn" onclick="reloadAll()">🔄 전체 새로고침</button>
+              <button class="btn warn" onclick="if(confirm('진짜 초기화?')){localStorage.clear();location.reload()}">🗑 로컬 캐시 초기화</button>
+            </div>
+
+            <div style="margin-top:18px;padding:12px;background:var(--pd);border-radius:8px;font-size:13px;color:var(--p);font-weight:600">
+              💡 Phase 2 예정: Teams 알림 자동 발송, Planner 자동 태스크, 구매/영업 모듈 데이터 자동 연동
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ━━━━ 모달들 ━━━━ -->
+
+<!-- 양식 선택 모달 -->
+<div class="modal" id="modalFormPicker">
+  <div class="mbox lg">
+    <div class="mh">
+      <div class="mt">📋 결재양식 선택</div>
+      <button class="mx" onclick="closeModal('modalFormPicker')">×</button>
+    </div>
+    <div class="mb">
+      <div class="form-tree">
+        <div class="form-cats" id="formCats"></div>
+        <div class="form-list" id="formList">
+          <div style="padding:30px;text-align:center;color:var(--t3)">← 왼쪽에서 카테고리를 선택하세요</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 결재 작성 모달 -->
+<div class="modal" id="modalCompose">
+  <div class="mbox lg">
+    <div class="mh">
+      <div class="mt" id="composeTitle">새 결재</div>
+      <button class="mx" onclick="closeModal('modalCompose')">×</button>
+    </div>
+    <div class="mb" id="composeBody"></div>
+    <div class="mf">
+      <button class="btn" onclick="closeModal('modalCompose')">취소</button>
+      <button class="btn" onclick="saveDraft()">💾 임시저장</button>
+      <button class="btn primary" onclick="submitApproval()">📤 결재 상신</button>
+    </div>
+  </div>
+</div>
+
+<!-- 결재 상세 모달 -->
+<div class="modal" id="modalDetail">
+  <div class="mbox lg">
+    <div class="mh">
+      <div class="mt" id="detailTitle">결재 상세</div>
+      <button class="mx" onclick="closeModal('modalDetail')">×</button>
+    </div>
+    <div class="mb" id="detailBody"></div>
+    <div class="mf" id="detailFoot">
+      <button class="btn" onclick="closeModal('modalDetail')">닫기</button>
+    </div>
+  </div>
+</div>
+
+<!-- HR Picker (직원 선택) 모달 -->
+<div class="modal" id="modalHRPick">
+  <div class="mbox">
+    <div class="mh">
+      <div class="mt">👤 직원 선택</div>
+      <button class="mx" onclick="closeModal('modalHRPick')">×</button>
+    </div>
+    <div class="mb">
+      <div class="hrpick-search">
+        <input class="si" id="hrpickSearch" placeholder="🔍 이름/부서/직급 검색" oninput="renderHRPickList()">
+        <select class="ss" id="hrpickDept" onchange="renderHRPickList()" style="width:auto"><option value="">전체</option></select>
+      </div>
+      <div class="hrpick-list" id="hrpickList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast" style="position:fixed;bottom:20px;right:20px;z-index:99999;display:flex;flex-direction:column;gap:8px"></div>
+
+<script>
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ENJET 전자결재 v1.0 - JavaScript
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+// ━━ MSAL 설정 (영업/구매와 동일) ━━
+const MSAL_CLIENT_ID = "76793776-3330-496f-97f1-9f0c034f3f07";
+const MSAL_TENANT_ID = "58b310e1-9278-47ab-8e49-792728818c9e";
+
+// ━━ SharePoint 경로 ━━
+const SP_SITE = "enjetco.sharepoint.com:/sites/06.BackOffice";
+const APPR_FOLDER = "📋 전자결재/99.Dashboard(real-time)";
+const APPR_MASTER_PATH = "📋 전자결재/99.Dashboard(real-time)/approval-master.json";
+const APPR_DRAFT_PATH = "📋 전자결재/99.Dashboard(real-time)/approval-drafts.json";
+const APPR_DOC_FOLDER = "📋 전자결재/결재문서";
+const HR_FILE_PATH = "👥 인사·총무·복지/01.인사/[인사현황] 20260507_인사관리.xlsx";
+
+const SCOPES = ["User.Read","Files.ReadWrite.All","Sites.ReadWrite.All","Chat.ReadWrite","Chat.Read","Mail.Send"];
+
+// ━━ 전역 상태 ━━
+let msal_, acct, spSite, spDrive;
+let hrData = [];
+let myProfile = null;
+let approvals = [];
+let drafts = [];
+let curPage = "home";
+let composeState = null;
+let detailState = null;
+
+// ━━ 유틸 ━━
+const $ = (id) => document.getElementById(id);
+const escHtml = (s) => String(s ?? "").replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+const fmtDate = (d) => { if(!d) return ""; const dt = new Date(d); return dt.toLocaleDateString("ko-KR"); };
+const fmtDT = (d) => { if(!d) return ""; const dt = new Date(d); return dt.toLocaleString("ko-KR", {month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"}); };
+const fmtMoney = (n) => { const v = parseFloat(n)||0; return v.toLocaleString("ko-KR"); };
+const today = () => new Date().toISOString().slice(0,10);
+const now = () => new Date().toISOString();
+const newId = (prefix) => `${prefix}-${new Date().toISOString().slice(2,10).replace(/-/g,"")}-${Math.floor(Math.random()*900+100)}`;
+
+function toast(msg, type="info") {
+  const t = $("toast");
+  const colors = { info:"var(--p)", success:"var(--g)", error:"var(--r)", warn:"var(--a)" };
+  const div = document.createElement("div");
+  div.style.cssText = `background:${colors[type]};color:#fff;padding:10px 16px;border-radius:8px;font-size:14px;font-weight:600;box-shadow:0 4px 12px rgba(0,0,0,0.2)`;
+  div.textContent = msg;
+  t.appendChild(div);
+  setTimeout(()=>div.remove(), 3500);
+}
+
+// ━━ MSAL ━━
+async function initApp() {
+  msal_ = new msal.PublicClientApplication({
+    auth: { clientId: MSAL_CLIENT_ID, authority: "https://login.microsoftonline.com/" + MSAL_TENANT_ID, redirectUri: location.href.split("?")[0].split("#")[0] },
+    cache: { cacheLocation: "sessionStorage" },
+  });
+  await msal_.initialize();
+  const a = msal_.getAllAccounts();
+  if (a.length > 0) { acct = a[0]; onOK(); }
+}
+
+async function login() {
+  const b = $("btnLogin"); b.disabled = true; b.textContent = "로그인 중...";
+  try {
+    const r = await msal_.loginPopup({ scopes: SCOPES, prompt: "select_account" });
+    acct = r.account; onOK();
+  } catch (e) {
+    b.disabled = false; b.innerHTML = '<div class="mslogo"></div>Microsoft 계정으로 로그인';
+    alert("로그인 실패: " + e.message);
+  }
+}
+
+function logout() {
+  if (!confirm("로그아웃하시겠습니까?")) return;
+  msal_.logoutPopup({ account: acct });
+}
+
+async function getToken() {
+  try { const r = await msal_.acquireTokenSilent({ scopes: SCOPES, account: acct }); return r.accessToken; }
+  catch (e) { const r = await msal_.acquireTokenPopup({ scopes: SCOPES }); return r.accessToken; }
+}
+
+async function gGet(url) {
+  const t = await getToken();
+  const r = await fetch("https://graph.microsoft.com/v1.0" + url, { headers: { Authorization: "Bearer " + t } });
+  if (!r.ok) { const txt = await r.text(); throw new Error(`Graph ${r.status}: ${txt.substring(0,150)}`); }
+  return r.json();
+}
+
+async function getIds() {
+  if (!spSite) { const d = await gGet("/sites/" + SP_SITE); spSite = d.id; }
+  if (!spDrive) {
+    const d = await gGet("/sites/" + spSite + "/drives");
+    const dr = d.value.find(x => x.name === "Documents" || x.name === "문서") || d.value[0];
+    spDrive = dr.id;
+  }
+}
+
+// ━━ SP I/O ━━
+async function spReadJSON(path) {
+  try {
+    await getIds();
+    const t = await getToken();
+    const url = `https://graph.microsoft.com/v1.0/drives/${spDrive}/root:/${encodeURIComponent(path)}:/content`;
+    const r = await fetch(url, { headers: { Authorization: "Bearer " + t } });
+    if (r.status === 404) return null;
+    if (!r.ok) throw new Error(`SP read ${r.status}`);
+    const txt = await r.text();
+    return txt ? JSON.parse(txt) : null;
+  } catch (e) { console.warn("spReadJSON:", path, e.message); return null; }
+}
+
+async function spWriteJSON(path, data) {
+  await getIds();
+  const t = await getToken();
+  const url = `https://graph.microsoft.com/v1.0/drives/${spDrive}/root:/${encodeURIComponent(path)}:/content`;
+  const r = await fetch(url, {
+    method: "PUT",
+    headers: { Authorization: "Bearer " + t, "Content-Type": "application/json" },
+    body: JSON.stringify(data, null, 2),
+  });
+  if (!r.ok) { const txt = await r.text(); throw new Error(`SP write ${r.status}: ${txt.substring(0,150)}`); }
+  return r.json();
+}
+
+async function spReadFile(path) {
+  await getIds();
+  const t = await getToken();
+  const url = `https://graph.microsoft.com/v1.0/drives/${spDrive}/root:/${encodeURIComponent(path)}:/content`;
+  const r = await fetch(url, { headers: { Authorization: "Bearer " + t } });
+  if (!r.ok) throw new Error(`SP file read ${r.status}`);
+  return r.arrayBuffer();
+}
+
+async function spUploadFile(path, file) {
+  await getIds();
+  const t = await getToken();
+  const url = `https://graph.microsoft.com/v1.0/drives/${spDrive}/root:/${encodeURIComponent(path)}:/content`;
+  const r = await fetch(url, { method: "PUT", headers: { Authorization: "Bearer " + t }, body: file });
+  if (!r.ok) throw new Error(`SP upload ${r.status}`);
+  return r.json();
+}
+
+// ━━ 인사 데이터 ━━
+async function loadHR() {
+  try {
+    $("syncTxt").textContent = "인사DB 로딩...";
+    const buf = await spReadFile(HR_FILE_PATH);
+    const wb = XLSX.read(buf, { type: "array" });
+    const ws = wb.Sheets["인사현황"] || wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { defval: "" });
+    hrData = rows.filter(r => r["성명"] && r["ID(email)"]);
+    console.log("✅ 인사DB:", hrData.length + "명");
+    return true;
+  } catch (e) {
+    console.error("인사DB 로드 실패:", e);
+    toast("인사DB 로드 실패: " + e.message, "error");
+    return false;
+  }
+}
+
+async function reloadHR() {
+  await loadHR();
+  resolveMyProfile();
+  if (curPage === "org") renderOrg();
+  toast("인사DB 재로딩 완료", "success");
+}
+
+function resolveMyProfile() {
+  if (!acct || !hrData.length) return null;
+  const myEmail = (acct.username || "").toLowerCase();
+  myProfile = hrData.find(p => String(p["ID(email)"] || "").toLowerCase() === myEmail && p["재직상태"] === "재직");
+  if (myProfile) {
+    $("sbUser").textContent = `${myProfile["성명"]} ${myProfile["직급"]}`;
+    $("sbUserSub").textContent = `${myProfile["부서"]} · ${myProfile["팀"] || ""}`;
+  } else {
+    $("sbUser").textContent = acct.name || acct.username;
+    $("sbUserSub").textContent = "인사DB 미등록";
+    toast("인사DB에 본인 정보가 없습니다", "warn");
+  }
+  return myProfile;
+}
+
+const activeHR = () => hrData.filter(p => p["재직상태"] === "재직");
+const findPersonByName = (name) => {
+  if (!name || name.trim() === "" || name === "　") return null;
+  return hrData.find(p => p["성명"] === name && p["재직상태"] === "재직");
+};
+
+function findDeptHead(dept) {
+  if (!dept) return null;
+  const RANK_ORDER = ["대표","부사장","전무","상무","이사","부장","차장","과장","대리","사원","반장"];
+  const members = activeHR().filter(p => p["부서"] === dept);
+  if (!members.length) return null;
+  members.sort((a,b) => {
+    const ra = RANK_ORDER.indexOf(a["직급"] || "");
+    const rb = RANK_ORDER.indexOf(b["직급"] || "");
+    return (ra === -1 ? 99 : ra) - (rb === -1 ? 99 : rb);
+  });
+  return members[0];
+}
+
+function findCEO() {
+  return activeHR().find(p => p["직급"] === "대표" || p["부서"] === "대표이사");
+}
+
+function findFinanceLead() {
+  const RANK_ORDER = ["대표","부사장","전무","상무","이사","부장","차장","과장","대리","사원"];
+  const list = activeHR().filter(p => p["팀"] === "재무회계팀");
+  if (!list.length) return null;
+  list.sort((a,b) => RANK_ORDER.indexOf(a["직급"]) - RANK_ORDER.indexOf(b["직급"]));
+  return list[0];
+}
+
+function findPurchaseLead() {
+  const RANK_ORDER = ["대표","부사장","전무","상무","이사","부장","차장","과장","대리","사원"];
+  const list = activeHR().filter(p => p["부서"] === "구매감사팀");
+  if (!list.length) return null;
+  list.sort((a,b) => RANK_ORDER.indexOf(a["직급"]) - RANK_ORDER.indexOf(b["직급"]));
+  return list[0];
+}
+
+// ━━ 결재라인 자동 생성 ━━
+function buildApprovalLine(formId, drafter, formData) {
+  if (!drafter) return [];
+  const line = [];
+  const addUnique = (p) => {
+    if (p && !line.some(x => x["ID(email)"] === p["ID(email)"]) && p["ID(email)"] !== drafter["ID(email)"]) {
+      line.push(p);
+    }
+  };
+  
+  if (formId === "VACATION") {
+    addUnique(findPersonByName(drafter["상위자"]));
+    addUnique(findDeptHead(drafter["부서"]));
+  } else if (formId === "EXPENSE") {
+    const amount = parseFloat(formData?.amount) || 0;
+    addUnique(findPersonByName(drafter["상위자"]));
+    addUnique(findFinanceLead());
+    if (amount >= 1000000) addUnique(findDeptHead(drafter["부서"]));
+    if (amount >= 5000000) addUnique(findCEO());
+  } else if (formId === "PURCHASE_REQUEST") {
+    addUnique(findPersonByName(drafter["상위자"]));
+    addUnique(findPurchaseLead());
+    addUnique(findDeptHead(drafter["부서"]));
+    addUnique(findCEO());
+  } else if (formId === "QUOTE_APPROVAL") {
+    addUnique(findPersonByName(drafter["상위자"]));
+    addUnique(findDeptHead(drafter["부서"]));
+    addUnique(findCEO());
+  }
+  
+  return line.map((p, i) => ({
+    step: i + 1,
+    email: p["ID(email)"],
+    name: p["성명"],
+    rank: p["직급"],
+    dept: p["부서"],
+    team: p["팀"] || "",
+    status: "대기",
+    actionDate: null,
+    comment: ""
+  }));
+}
+
+// ━━ 결재 데이터 ━━
+async function loadApprovals() {
+  const data = await spReadJSON(APPR_MASTER_PATH);
+  approvals = (data && data.approvals) || [];
+  console.log("✅ 결재:", approvals.length + "건");
+}
+
+async function loadDrafts() {
+  const data = await spReadJSON(APPR_DRAFT_PATH);
+  drafts = (data && data.drafts) || [];
+}
+
+const saveApprovals = () => spWriteJSON(APPR_MASTER_PATH, { approvals, lastUpdate: now() });
+const saveDrafts = () => spWriteJSON(APPR_DRAFT_PATH, { drafts, lastUpdate: now() });
+
+// ━━ 양식 정의 ━━
+const FORM_CATEGORIES = [
+  { id: "근태", name: "📅 근태" },
+  { id: "회계", name: "💰 회계/재무" },
+  { id: "구매", name: "🛒 구매" },
+  { id: "영업", name: "💼 영업" },
+  { id: "인사", name: "👥 인사" },
+  { id: "출장", name: "✈️ 출장" },
+  { id: "일반", name: "📄 일반" }
+];
+
+const FORM_TEMPLATES = [
+  // Phase 1 - 활성
+  { id: "VACATION", name: "휴가신청서", category: "근태", icon: "🌴", phase: 1 },
+  { id: "EXPENSE", name: "지출결의서(엔젯)", category: "회계", icon: "💵", phase: 1 },
+  { id: "PURCHASE_REQUEST", name: "구매품의서", category: "구매", icon: "🛒", phase: 1 },
+  { id: "QUOTE_APPROVAL", name: "견적승인", category: "영업", icon: "💼", phase: 1 },
+  // Phase 2 - 다우오피스 양식 목록 (준비중)
+  { id: "VACATION_PREGNANT", name: "임산부 근로시간 단축 신청서", category: "근태", phase: 2 },
+  { id: "QUOTE_CUSTOMER", name: "견적서(고객사 제출)", category: "영업", phase: 2 },
+  { id: "RECOMMEND_PAYMENT", name: "인재추천수당 지급신청서", category: "인사", phase: 2 },
+  { id: "RECOMMEND_PERSON", name: "인재추천서", category: "인사", phase: 2 },
+  { id: "CCTV_VIEW", name: "CCTV 조회 신청서", category: "일반", phase: 2 },
+  { id: "CONGRATS_FUND", name: "경조화(금)신청", category: "인사", phase: 2 },
+  { id: "BUSINESS_CARD", name: "명함신청", category: "일반", phase: 2 },
+  { id: "RETIRE_PARTIAL", name: "퇴직금 중간정산 신청서", category: "인사", phase: 2 },
+  { id: "REASON_NOTE", name: "사유서", category: "인사", phase: 2 },
+  { id: "RESIGN", name: "사직서", category: "인사", phase: 2 },
+  { id: "EDUCATION", name: "교육수강신청", category: "인사", phase: 2 },
+  { id: "EDUCATION_REPORT", name: "전파교육 보고", category: "인사", phase: 2 },
+  { id: "PROMOTE_SPECIAL", name: "특별승진 추천서", category: "인사", phase: 2 },
+  { id: "HIRING", name: "채용요청", category: "인사", phase: 2 },
+  { id: "RETURN_WORK", name: "복직원", category: "인사", phase: 2 },
+  { id: "FLEX_HOUR", name: "시차출퇴근 신청서", category: "인사", phase: 2 },
+  { id: "LEAVE_ABSENCE", name: "휴직원", category: "인사", phase: 2 },
+  { id: "CASH_LOG", name: "현금출납장", category: "회계", phase: 2 },
+  { id: "NEW_VENDOR", name: "신규거래처등록신청", category: "회계", phase: 2 },
+  { id: "FUND_REPORT", name: "자금일보", category: "회계", phase: 2 },
+  { id: "FUEL_REIMB", name: "차량 유류비 정산서", category: "출장", phase: 2 },
+  { id: "BIZ_TRIP", name: "출장신청", category: "출장", phase: 2 },
+  { id: "BIZ_TRIP_REPORT", name: "출장결과보고서", category: "출장", phase: 2 },
+  { id: "OUT_FIELD", name: "외근신청서", category: "출장", phase: 2 },
+  { id: "SAFETY_WORK", name: "안전 작업 허가 신청서", category: "일반", phase: 2 },
+  { id: "CARD_LIMIT", name: "법인카드 증액 신청서", category: "회계", phase: 2 },
+  { id: "GENERAL_DRAFT", name: "품의서", category: "일반", phase: 2 },
+  { id: "INCIDENT_REPORT", name: "사고보고서", category: "일반", phase: 2 },
+  { id: "RESULT_REPORT", name: "결과 보고서", category: "일반", phase: 2 },
+  { id: "WORK_ORDER", name: "제작/공정 의뢰서", category: "일반", phase: 2 },
+  { id: "MEETING_BUDGET", name: "회의비 사용 계획서", category: "일반", phase: 2 },
+  { id: "SEAL_RELEASE", name: "사용인감 반출신청서", category: "일반", phase: 2 },
+  { id: "ENTERTAIN_DRAFT", name: "접대비 품의서", category: "일반", phase: 2 }
+];
+
+// ━━ 페이지 네비 ━━
+function go(page) {
+  curPage = page;
+  document.querySelectorAll(".ni").forEach(n => n.classList.toggle("on", n.dataset.page === page));
+  document.querySelectorAll(".page").forEach(p => p.classList.toggle("on", p.id === "page-" + page));
+  const titles = { home:"🏠 홈", inbox:"📥 받은 결재함", sent:"📤 보낸 결재함", cc:"📋 참조 결재함", draft:"📝 임시저장함", org:"👥 조직도", settings:"⚙️ 설정" };
+  $("pageTitle").textContent = titles[page] || page;
+  if (page === "home") renderHome();
+  else if (page === "inbox") renderInbox();
+  else if (page === "sent") renderSent();
+  else if (page === "cc") renderCC();
+  else if (page === "draft") renderDraftList();
+  else if (page === "org") renderOrg();
+}
+
+// ━━ 뱃지 ━━
+function updateInboxBadge() {
+  const myEmail = (acct?.username || "").toLowerCase();
+  const waiting = approvals.filter(a =>
+    a.status === "진행중" &&
+    a.approvalLine?.[a.currentStep]?.email?.toLowerCase() === myEmail &&
+    a.approvalLine?.[a.currentStep]?.status === "대기"
+  );
+  const badge = $("badgeInbox");
+  if (waiting.length > 0) { badge.textContent = waiting.length; badge.style.display = "inline-block"; }
+  else { badge.style.display = "none"; }
+}
+
+// ━━ 상태 뱃지 ━━
+function stBadge(status, label) {
+  if (label === "내 차례") return `<span class="bdg prog">🔔 내 차례</span>`;
+  if (label === "승인") return `<span class="bdg done">✓ 승인함</span>`;
+  if (label === "반려") return `<span class="bdg rej">✕ 반려함</span>`;
+  if (status === "진행중") return `<span class="bdg prog">진행중</span>`;
+  if (status === "완료") return `<span class="bdg done">완료</span>`;
+  if (status === "반려") return `<span class="bdg rej">반려</span>`;
+  return `<span class="bdg draft">${escHtml(status||"")}</span>`;
+}
+
+// ━━ 홈 ━━
+function renderHome() {
+  const myEmail = (acct?.username || "").toLowerCase();
+  const waiting = approvals.filter(a =>
+    a.status === "진행중" &&
+    a.approvalLine?.[a.currentStep]?.email?.toLowerCase() === myEmail &&
+    a.approvalLine?.[a.currentStep]?.status === "대기"
+  );
+  const myProg = approvals.filter(a => a.drafter?.email?.toLowerCase() === myEmail && a.status === "진행중");
+  const thisMonth = new Date().toISOString().slice(0,7);
+  const myDone = approvals.filter(a => a.drafter?.email?.toLowerCase() === myEmail && a.status === "완료" && (a.updatedAt||"").startsWith(thisMonth));
+  const myRej = approvals.filter(a => a.drafter?.email?.toLowerCase() === myEmail && a.status === "반려" && (a.updatedAt||"").startsWith(thisMonth));
+
+  $("kpiWait").textContent = waiting.length;
+  $("kpiProg").textContent = myProg.length;
+  $("kpiDone").textContent = myDone.length;
+  $("kpiRej").textContent = myRej.length;
+
+  // 최근 받은 결재
+  const recentInbox = waiting.slice(0,5);
+  if (recentInbox.length === 0) {
+    $("recentInbox").innerHTML = `<div class="empty"><div class="empty-icon">📭</div>결재할 문서가 없습니다</div>`;
+  } else {
+    $("recentInbox").innerHTML = `<table class="tbl">
+      <thead><tr><th>양식</th><th>제목</th><th>기안자</th><th>제출일</th><th></th></tr></thead>
+      <tbody>${recentInbox.map(a => `
+        <tr class="row-clk" onclick="openDetail('${a.id}')">
+          <td><strong>${escHtml(a.formName)}</strong></td>
+          <td>${escHtml(a.title)}</td>
+          <td>${escHtml(a.drafter?.name || "")} ${escHtml(a.drafter?.rank || "")}</td>
+          <td>${fmtDT(a.createdAt)}</td>
+          <td><button class="btn primary sm" onclick="event.stopPropagation();openDetail('${a.id}')">결재 →</button></td>
+        </tr>`).join("")}</tbody>
+    </table>`;
+  }
+
+  const recentSent = myProg.slice(0,5);
+  if (recentSent.length === 0) {
+    $("recentSent").innerHTML = `<div class="empty"><div class="empty-icon">📝</div>제출한 결재가 없습니다</div>`;
+  } else {
+    $("recentSent").innerHTML = `<table class="tbl">
+      <thead><tr><th>양식</th><th>제목</th><th>진행</th><th>현재 결재자</th><th>제출일</th></tr></thead>
+      <tbody>${recentSent.map(a => `
+        <tr class="row-clk" onclick="openDetail('${a.id}')">
+          <td><strong>${escHtml(a.formName)}</strong></td>
+          <td>${escHtml(a.title)}</td>
+          <td>${a.currentStep + 1} / ${a.approvalLine.length}</td>
+          <td>${escHtml(a.approvalLine[a.currentStep]?.name || "-")} ${escHtml(a.approvalLine[a.currentStep]?.rank || "")}</td>
+          <td>${fmtDT(a.createdAt)}</td>
+        </tr>`).join("")}</tbody>
+    </table>`;
+  }
+}
+
+// ━━ 받은 결재함 ━━
+function renderInbox() {
+  const myEmail = (acct?.username || "").toLowerCase();
+  const filter = $("inboxFilter").value;
+  let list = approvals.filter(a => a.approvalLine?.some(s => s.email?.toLowerCase() === myEmail));
+  if (filter === "wait") {
+    list = list.filter(a => a.status === "진행중" && a.approvalLine?.[a.currentStep]?.email?.toLowerCase() === myEmail && a.approvalLine?.[a.currentStep]?.status === "대기");
+  } else if (filter === "done") {
+    list = list.filter(a => a.approvalLine?.some(s => s.email?.toLowerCase() === myEmail && s.status !== "대기"));
+  }
+  list.sort((a,b) => (b.createdAt||"").localeCompare(a.createdAt||""));
+
+  if (list.length === 0) {
+    $("inboxList").innerHTML = `<div class="empty"><div class="empty-icon">📭</div>결재 문서가 없습니다</div>`;
+    return;
+  }
+
+  $("inboxList").innerHTML = `<table class="tbl">
+    <thead><tr><th style="width:100px">상태</th><th>양식</th><th>제목</th><th>기안자</th><th>제출일</th><th style="width:120px"></th></tr></thead>
+    <tbody>${list.map(a => {
+      const myStep = a.approvalLine.find(s => s.email?.toLowerCase() === myEmail);
+      const isMyCurrent = a.approvalLine?.[a.currentStep]?.email?.toLowerCase() === myEmail && a.status === "진행중" && a.approvalLine?.[a.currentStep]?.status === "대기";
+      return `<tr class="row-clk" onclick="openDetail('${a.id}')">
+        <td>${stBadge(a.status, isMyCurrent ? "내 차례" : (myStep?.status || ""))}</td>
+        <td><strong>${escHtml(a.formName)}</strong></td>
+        <td>${escHtml(a.title)}</td>
+        <td>${escHtml(a.drafter?.name || "")} ${escHtml(a.drafter?.rank || "")}<br><span style="font-size:12px;color:var(--t3)">${escHtml(a.drafter?.dept || "")}</span></td>
+        <td>${fmtDT(a.createdAt)}</td>
+        <td>${isMyCurrent ? `<button class="btn primary sm" onclick="event.stopPropagation();openDetail('${a.id}')">결재하기</button>` : `<button class="btn sm" onclick="event.stopPropagation();openDetail('${a.id}')">상세</button>`}</td>
+      </tr>`;
+    }).join("")}</tbody>
+  </table>`;
+}
+
+// ━━ 보낸 결재함 ━━
+function renderSent() {
+  const myEmail = (acct?.username || "").toLowerCase();
+  const filter = $("sentFilter").value;
+  let list = approvals.filter(a => a.drafter?.email?.toLowerCase() === myEmail);
+  if (filter !== "all") list = list.filter(a => a.status === filter);
+  list.sort((a,b) => (b.createdAt||"").localeCompare(a.createdAt||""));
+
+  if (list.length === 0) {
+    $("sentList").innerHTML = `<div class="empty"><div class="empty-icon">📭</div>제출한 결재가 없습니다</div>`;
+    return;
+  }
+
+  $("sentList").innerHTML = `<table class="tbl">
+    <thead><tr><th style="width:80px">상태</th><th>양식</th><th>제목</th><th>현재 결재자</th><th>진행</th><th>제출일</th></tr></thead>
+    <tbody>${list.map(a => `
+      <tr class="row-clk" onclick="openDetail('${a.id}')">
+        <td>${stBadge(a.status, "")}</td>
+        <td><strong>${escHtml(a.formName)}</strong></td>
+        <td>${escHtml(a.title)}</td>
+        <td>${a.status==="진행중" ? `${escHtml(a.approvalLine[a.currentStep]?.name || "-")} ${escHtml(a.approvalLine[a.currentStep]?.rank || "")}` : "-"}</td>
+        <td>${a.currentStep + 1} / ${a.approvalLine.length}</td>
+        <td>${fmtDT(a.createdAt)}</td>
+      </tr>`).join("")}</tbody>
+  </table>`;
+}
+
+function renderCC() {
+  $("ccList").innerHTML = `<div class="empty"><div class="empty-icon">📋</div>참조 기능은 Phase 2에 구현 예정입니다</div>`;
+}
+
+// ━━ 임시저장 ━━
+function renderDraftList() {
+  const myEmail = (acct?.username || "").toLowerCase();
+  const myDrafts = drafts.filter(d => d.drafter?.email?.toLowerCase() === myEmail);
+  myDrafts.sort((a,b) => (b.savedAt||"").localeCompare(a.savedAt||""));
+  if (myDrafts.length === 0) {
+    $("draftList").innerHTML = `<div class="empty"><div class="empty-icon">📝</div>임시저장된 문서가 없습니다</div>`;
+    return;
+  }
+  $("draftList").innerHTML = `<table class="tbl">
+    <thead><tr><th>양식</th><th>제목</th><th>저장일시</th><th></th></tr></thead>
+    <tbody>${myDrafts.map(d => `
+      <tr>
+        <td><strong>${escHtml(d.formName)}</strong></td>
+        <td>${escHtml(d.title || "(제목없음)")}</td>
+        <td>${fmtDT(d.savedAt)}</td>
+        <td>
+          <button class="btn primary sm" onclick="loadDraft('${d.id}')">이어쓰기</button>
+          <button class="btn danger sm" onclick="deleteDraft('${d.id}')">삭제</button>
+        </td>
+      </tr>`).join("")}</tbody>
+  </table>`;
+}
+
+async function loadDraft(id) {
+  const d = drafts.find(x => x.id === id);
+  if (!d) return;
+  composeState = JSON.parse(JSON.stringify(d));
+  composeState.fromDraft = true;
+  openComposeModal();
+}
+
+async function deleteDraft(id) {
+  if (!confirm("이 임시저장을 삭제하시겠습니까?")) return;
+  drafts = drafts.filter(d => d.id !== id);
+  await saveDrafts();
+  renderDraftList();
+  toast("삭제되었습니다", "success");
+}
+
+// ━━ 조직도 ━━
+function renderOrg() {
+  const q = ($("orgSearch")?.value || "").toLowerCase().trim();
+  const deptF = $("orgDeptF")?.value || "";
+  const depts = [...new Set(activeHR().map(p => p["부서"]).filter(Boolean))].sort();
+  const sel = $("orgDeptF");
+  if (sel && sel.options.length <= 1) {
+    sel.innerHTML = '<option value="">전체 부서</option>' + depts.map(d => `<option value="${escHtml(d)}">${escHtml(d)}</option>`).join("");
+  }
+  let list = activeHR();
+  if (deptF) list = list.filter(p => p["부서"] === deptF);
+  if (q) list = list.filter(p => [p["성명"],p["부서"],p["팀"],p["직급"],p["ID(email)"]].some(v => String(v||"").toLowerCase().includes(q)));
+
+  const RANK_ORDER = ["대표","부사장","전무","상무","이사","부장","차장","과장","대리","사원","반장"];
+  list.sort((a,b) => {
+    if (a["부서"] !== b["부서"]) return (a["부서"]||"").localeCompare(b["부서"]||"");
+    if (a["팀"] !== b["팀"]) return (a["팀"]||"").localeCompare(b["팀"]||"");
+    return RANK_ORDER.indexOf(a["직급"]) - RANK_ORDER.indexOf(b["직급"]);
+  });
+
+  if (list.length === 0) {
+    $("orgList").innerHTML = `<div class="empty"><div class="empty-icon">👥</div>검색 결과가 없습니다</div>`;
+    return;
+  }
+
+  const groups = {};
+  list.forEach(p => {
+    const key = `${p["부서"]} / ${p["팀"] || ""}`;
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(p);
+  });
+
+  const DEPT_COLOR = {"경영전략본부":"#0f4c81","ES사업부":"#1a6bb5","기술연구소":"#00b4d8","미래성장전략팀":"#10b981","리사이클링부문":"#a67c52","구매감사팀":"#d95f00","대표이사":"#c8201e"};
+
+  $("orgList").innerHTML = Object.entries(groups).map(([key, members]) => {
+    const dept = members[0]["부서"];
+    const color = DEPT_COLOR[dept] || "var(--p)";
+    return `<div style="margin-bottom:14px">
+      <div style="font-size:13px;font-weight:700;color:${color};margin-bottom:6px;display:flex;align-items:center;gap:6px">
+        <span style="display:inline-block;width:3px;height:14px;background:${color};border-radius:99px"></span>
+        ${escHtml(key)} <span style="color:var(--t3);font-weight:600">(${members.length}명)</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px">
+        ${members.map(p => `
+          <div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:10px;display:flex;align-items:center;gap:10px">
+            <div style="width:38px;height:38px;border-radius:50%;background:${color};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px">${escHtml((p["성명"]||"").substring(0,1))}</div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:14px;font-weight:700">${escHtml(p["성명"])} <span style="font-size:12px;color:var(--t3);font-weight:500">${escHtml(p["직급"]||"")}</span></div>
+              <div style="font-size:11px;color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(p["ID(email)"]||"")}</div>
+              ${p["상위자"] && p["상위자"].trim() && p["상위자"]!=="　" ? `<div style="font-size:11px;color:var(--t2);margin-top:2px">↑ ${escHtml(p["상위자"])}</div>` : ""}
+            </div>
+          </div>`).join("")}
+      </div>
+    </div>`;
+  }).join("");
+}
+
+// ━━ 양식 선택 모달 ━━
+function openFormPicker() {
+  if (!myProfile) {
+    toast("인사DB에 본인 정보가 없습니다. 관리자에게 문의하세요.", "error");
+    return;
+  }
+  renderFormCats();
+  $("modalFormPicker").classList.add("on");
+}
+
+function renderFormCats() {
+  $("formCats").innerHTML = FORM_CATEGORIES.map((c, i) =>
+    `<div class="form-cat ${i===0?'on':''}" onclick="selectFormCat('${c.id}',this)">${escHtml(c.name)}</div>`
+  ).join("");
+  selectFormCat("근태", $("formCats").children[0]);
+}
+
+function selectFormCat(catId, el) {
+  document.querySelectorAll(".form-cat").forEach(e => e.classList.remove("on"));
+  if (el) el.classList.add("on");
+  const forms = FORM_TEMPLATES.filter(f => f.category === catId);
+  if (forms.length === 0) {
+    $("formList").innerHTML = `<div style="padding:30px;text-align:center;color:var(--t3)">이 카테고리에 양식이 없습니다</div>`;
+    return;
+  }
+  $("formList").innerHTML = forms.map(f => {
+    if (f.phase === 1) {
+      return `<div class="form-item" onclick="startCompose('${f.id}')">
+        <span class="form-item-icon">${f.icon || "📄"}</span>
+        <span>${escHtml(f.name)}</span>
+        <span style="margin-left:auto;font-size:11px;background:var(--gd);color:var(--g);padding:2px 7px;border-radius:99px;font-weight:700">사용가능</span>
+      </div>`;
+    } else {
+      return `<div class="form-item coming">
+        <span class="form-item-icon">📄</span>
+        <span>${escHtml(f.name)}</span>
+        <span class="form-item-coming-tag">준비중</span>
+      </div>`;
+    }
+  }).join("");
+}
+
+// ━━ 작성 ━━
+function startCompose(formId) {
+  const tmpl = FORM_TEMPLATES.find(f => f.id === formId);
+  if (!tmpl) return;
+  closeModal("modalFormPicker");
+  composeState = {
+    id: newId("AP"),
+    formId: formId,
+    formName: tmpl.name,
+    formIcon: tmpl.icon || "📄",
+    title: "",
+    drafter: {
+      email: myProfile["ID(email)"],
+      name: myProfile["성명"],
+      rank: myProfile["직급"],
+      dept: myProfile["부서"],
+      team: myProfile["팀"] || ""
+    },
+    formData: {},
+    approvalLine: [],
+    attachments: [],
+    urgency: "보통",
+    status: "작성중",
+    currentStep: 0,
+    createdAt: now(),
+    updatedAt: now()
+  };
+  openComposeModal();
+}
+
+function openComposeModal() {
+  $("composeTitle").textContent = `${composeState.formIcon} ${composeState.formName} 작성`;
+  $("composeBody").innerHTML = renderComposeForm();
+  $("modalCompose").classList.add("on");
+  setTimeout(() => updateApprovalLine(), 100);
+}
+
+function renderComposeForm() {
+  const f = composeState;
+  let formHtml = "";
+
+  if (f.formId === "VACATION") {
+    formHtml = `
+      <div class="row2">
+        <div class="fg">
+          <label class="fl">휴가 종류<span class="req">*</span></label>
+          <select class="ss" id="f_vacationType" onchange="composeState.formData.vacationType=this.value">
+            <option value="">선택</option>
+            <option value="연차" ${f.formData.vacationType==="연차"?"selected":""}>연차</option>
+            <option value="반차(오전)" ${f.formData.vacationType==="반차(오전)"?"selected":""}>반차(오전)</option>
+            <option value="반차(오후)" ${f.formData.vacationType==="반차(오후)"?"selected":""}>반차(오후)</option>
+            <option value="병가" ${f.formData.vacationType==="병가"?"selected":""}>병가</option>
+            <option value="공가" ${f.formData.vacationType==="공가"?"selected":""}>공가</option>
+            <option value="경조휴가" ${f.formData.vacationType==="경조휴가"?"selected":""}>경조휴가</option>
+            <option value="기타" ${f.formData.vacationType==="기타"?"selected":""}>기타</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label class="fl">긴급도</label>
+          <select class="ss" onchange="composeState.urgency=this.value">
+            <option value="보통" ${f.urgency==="보통"?"selected":""}>보통</option>
+            <option value="긴급" ${f.urgency==="긴급"?"selected":""}>긴급</option>
+          </select>
+        </div>
+      </div>
+      <div class="row2">
+        <div class="fg">
+          <label class="fl">시작일<span class="req">*</span></label>
+          <input type="date" class="si" id="f_startDate" value="${f.formData.startDate||''}" onchange="composeState.formData.startDate=this.value;calcVacationDays()">
+        </div>
+        <div class="fg">
+          <label class="fl">종료일<span class="req">*</span></label>
+          <input type="date" class="si" id="f_endDate" value="${f.formData.endDate||''}" onchange="composeState.formData.endDate=this.value;calcVacationDays()">
+        </div>
+      </div>
+      <div class="fg">
+        <label class="fl">일수</label>
+        <input type="text" class="si" id="f_days" readonly placeholder="자동 계산" value="${f.formData.days?f.formData.days+'일':''}">
+      </div>
+      <div class="fg">
+        <label class="fl">사유<span class="req">*</span></label>
+        <textarea class="ta" id="f_reason" onchange="composeState.formData.reason=this.value">${escHtml(f.formData.reason||'')}</textarea>
+      </div>
+    `;
+  } else if (f.formId === "EXPENSE") {
+    formHtml = `
+      <div class="row2">
+        <div class="fg">
+          <label class="fl">지출 구분<span class="req">*</span></label>
+          <select class="ss" id="f_expenseType" onchange="composeState.formData.expenseType=this.value">
+            <option value="">선택</option>
+            <option value="업무추진비" ${f.formData.expenseType==="업무추진비"?"selected":""}>업무추진비</option>
+            <option value="접대비" ${f.formData.expenseType==="접대비"?"selected":""}>접대비</option>
+            <option value="회의비" ${f.formData.expenseType==="회의비"?"selected":""}>회의비</option>
+            <option value="교통비" ${f.formData.expenseType==="교통비"?"selected":""}>교통비</option>
+            <option value="복리후생비" ${f.formData.expenseType==="복리후생비"?"selected":""}>복리후생비</option>
+            <option value="소모품비" ${f.formData.expenseType==="소모품비"?"selected":""}>소모품비</option>
+            <option value="기타" ${f.formData.expenseType==="기타"?"selected":""}>기타</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label class="fl">지출일<span class="req">*</span></label>
+          <input type="date" class="si" id="f_expenseDate" value="${f.formData.expenseDate||today()}" onchange="composeState.formData.expenseDate=this.value">
+        </div>
+      </div>
+      <div class="fg">
+        <label class="fl">금액 (원)<span class="req">*</span></label>
+        <input type="number" class="si" id="f_amount" placeholder="0" value="${f.formData.amount||''}" oninput="composeState.formData.amount=this.value;updateApprovalLine()">
+        <div style="font-size:12px;color:var(--t3);margin-top:4px">💡 100만원 미만: 상사+재무 / 100~500만: +본부장 / 500만+: +CEO</div>
+      </div>
+      <div class="row2">
+        <div class="fg">
+          <label class="fl">거래처/대상<span class="req">*</span></label>
+          <input type="text" class="si" id="f_vendor" value="${escHtml(f.formData.vendor||'')}" onchange="composeState.formData.vendor=this.value">
+        </div>
+        <div class="fg">
+          <label class="fl">결제 방법</label>
+          <select class="ss" id="f_payMethod" onchange="composeState.formData.payMethod=this.value">
+            <option value="법인카드" ${f.formData.payMethod==="법인카드"?"selected":""}>법인카드</option>
+            <option value="개인카드(환급요청)" ${f.formData.payMethod==="개인카드(환급요청)"?"selected":""}>개인카드(환급요청)</option>
+            <option value="계좌이체" ${f.formData.payMethod==="계좌이체"?"selected":""}>계좌이체</option>
+            <option value="현금" ${f.formData.payMethod==="현금"?"selected":""}>현금</option>
+          </select>
+        </div>
+      </div>
+      <div class="fg">
+        <label class="fl">지출 사유 / 상세 내역<span class="req">*</span></label>
+        <textarea class="ta" id="f_reason" onchange="composeState.formData.reason=this.value">${escHtml(f.formData.reason||'')}</textarea>
+      </div>
+    `;
+  } else if (f.formId === "PURCHASE_REQUEST") {
+    formHtml = `
+      <div class="row2">
+        <div class="fg">
+          <label class="fl">프로젝트 코드</label>
+          <input type="text" class="si" id="f_pjCode" placeholder="예: BM26005" value="${escHtml(f.formData.pjCode||'')}" onchange="composeState.formData.pjCode=this.value">
+        </div>
+        <div class="fg">
+          <label class="fl">PR 코드 (구매모듈)</label>
+          <input type="text" class="si" id="f_prCode" placeholder="예: PR-260520-427" value="${escHtml(f.formData.prCode||'')}" onchange="composeState.formData.prCode=this.value">
+        </div>
+      </div>
+      <div style="font-size:12px;color:var(--p);margin:-6px 0 12px;padding:8px;background:var(--pd);border-radius:6px">📦 Phase 2: 구매모듈 PR 데이터 자동 연동 예정</div>
+      <div class="fg">
+        <label class="fl">총 금액 (원)<span class="req">*</span></label>
+        <input type="number" class="si" id="f_totalAmount" placeholder="0" value="${f.formData.totalAmount||''}" onchange="composeState.formData.totalAmount=this.value">
+      </div>
+      <div class="row2">
+        <div class="fg">
+          <label class="fl">거래처</label>
+          <input type="text" class="si" id="f_vendor" value="${escHtml(f.formData.vendor||'')}" onchange="composeState.formData.vendor=this.value">
+        </div>
+        <div class="fg">
+          <label class="fl">필요시점</label>
+          <input type="date" class="si" id="f_dueDate" value="${f.formData.dueDate||''}" onchange="composeState.formData.dueDate=this.value">
+        </div>
+      </div>
+      <div class="fg">
+        <label class="fl">구매 사유 / 용도<span class="req">*</span></label>
+        <textarea class="ta" id="f_reason" onchange="composeState.formData.reason=this.value">${escHtml(f.formData.reason||'')}</textarea>
+      </div>
+    `;
+  } else if (f.formId === "QUOTE_APPROVAL") {
+    formHtml = `
+      <div class="row2">
+        <div class="fg">
+          <label class="fl">프로젝트 코드</label>
+          <input type="text" class="si" id="f_pjCode" placeholder="예: SL26012" value="${escHtml(f.formData.pjCode||'')}" onchange="composeState.formData.pjCode=this.value">
+        </div>
+        <div class="fg">
+          <label class="fl">고객사<span class="req">*</span></label>
+          <input type="text" class="si" id="f_customer" value="${escHtml(f.formData.customer||'')}" onchange="composeState.formData.customer=this.value">
+        </div>
+      </div>
+      <div style="font-size:12px;color:var(--p);margin:-6px 0 12px;padding:8px;background:var(--pd);border-radius:6px">📦 Phase 2: 영업모듈 견적 데이터 자동 연동 예정</div>
+      <div class="row2">
+        <div class="fg">
+          <label class="fl">견적 금액 (원)<span class="req">*</span></label>
+          <input type="number" class="si" id="f_quoteAmount" placeholder="0" value="${f.formData.quoteAmount||''}" onchange="composeState.formData.quoteAmount=this.value">
+        </div>
+        <div class="fg">
+          <label class="fl">할인율 (%)</label>
+          <input type="number" step="0.1" class="si" id="f_discount" placeholder="0" value="${f.formData.discount||''}" onchange="composeState.formData.discount=this.value">
+        </div>
+      </div>
+      <div class="fg">
+        <label class="fl">제품/서비스 내역<span class="req">*</span></label>
+        <textarea class="ta" id="f_items" onchange="composeState.formData.items=this.value">${escHtml(f.formData.items||'')}</textarea>
+      </div>
+      <div class="fg">
+        <label class="fl">승인 사유 / 특이사항</label>
+        <textarea class="ta" id="f_reason" onchange="composeState.formData.reason=this.value">${escHtml(f.formData.reason||'')}</textarea>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="fg">
+      <label class="fl">제목<span class="req">*</span></label>
+      <input type="text" class="si" id="f_title" placeholder="결재 제목을 입력하세요" value="${escHtml(composeState.title||'')}" onchange="composeState.title=this.value">
+    </div>
+    <div class="form-paper">
+      <h3>${composeState.formIcon} ${escHtml(composeState.formName)}</h3>
+      ${formHtml}
+    </div>
+    <div style="margin-top:18px">
+      <label class="fl">📋 결재라인 (자동 생성)</label>
+      <div id="approvalLinePreview"></div>
+    </div>
+    <div style="margin-top:14px">
+      <label class="fl">📎 첨부파일</label>
+      <div class="atch-zone" onclick="document.getElementById('atchInput').click()">
+        <div>📎 클릭하여 파일 선택 (PDF, 이미지, 문서)</div>
+      </div>
+      <input type="file" id="atchInput" multiple style="display:none" onchange="addAttachments(this.files)">
+      <div class="atch-list" id="atchList"></div>
+    </div>
+  `;
+}
+
+function calcVacationDays() {
+  const s = $("f_startDate")?.value;
+  const e = $("f_endDate")?.value;
+  if (!s || !e) return;
+  const sd = new Date(s), ed = new Date(e);
+  if (ed < sd) { $("f_days").value = "잘못된 기간"; return; }
+  const diff = Math.ceil((ed - sd) / (1000*60*60*24)) + 1;
+  $("f_days").value = diff + "일";
+  composeState.formData.days = diff;
+}
+
+function updateApprovalLine() {
+  const line = buildApprovalLine(composeState.formId, myProfile, composeState.formData);
+  composeState.approvalLine = line;
+  const el = $("approvalLinePreview");
+  if (el) el.innerHTML = renderApprovalLine(line, -1);
+}
+
+function renderApprovalLine(line, currentStep) {
+  if (!line || line.length === 0) {
+    return `<div style="padding:14px;background:var(--rd);color:var(--r);border-radius:8px;font-size:13px">⚠️ 결재라인을 생성할 수 없습니다. 인사DB에서 상위자 정보를 확인하세요.</div>`;
+  }
+  let html = `<div class="aline">`;
+  html += `<div class="astep done">
+    <div class="astep-name">${escHtml(myProfile?.["성명"]||"기안자")}</div>
+    <div class="astep-rank">${escHtml(myProfile?.["직급"]||"")}</div>
+    <div class="astep-status">📝 기안</div>
+  </div>`;
+  line.forEach((s, i) => {
+    html += `<div class="aarr">→</div>`;
+    let cls = "astep";
+    let statusLabel = "대기";
+    if (s.status === "승인") { cls += " done"; statusLabel = "✓ 승인"; }
+    else if (s.status === "반려") { cls += " rej"; statusLabel = "✕ 반려"; }
+    else if (i === currentStep) { cls += " curr"; statusLabel = "🔔 결재중"; }
+    html += `<div class="${cls}">
+      <div class="astep-name">${escHtml(s.name)}</div>
+      <div class="astep-rank">${escHtml(s.rank)} · ${escHtml(s.dept)}</div>
+      <div class="astep-status">${statusLabel}</div>
+    </div>`;
+  });
+  html += `</div>`;
+  return html;
+}
+
+// ━━ 첨부파일 ━━
+function addAttachments(files) {
+  for (const f of files) {
+    composeState.attachments.push({ name: f.name, size: f.size, _file: f });
+  }
+  renderAttachments();
+}
+
+function removeAttachment(idx) {
+  composeState.attachments.splice(idx, 1);
+  renderAttachments();
+}
+
+function renderAttachments() {
+  const list = composeState.attachments;
+  if (list.length === 0) { $("atchList").innerHTML = ""; return; }
+  $("atchList").innerHTML = list.map((a, i) =>
+    `<div class="atch-item">
+      📎 <span>${escHtml(a.name)}</span>
+      <span style="color:var(--t3);font-size:12px">(${(a.size/1024).toFixed(1)} KB)</span>
+      <span class="atch-item-rm" onclick="removeAttachment(${i})">✕</span>
+    </div>`
+  ).join("");
+}
+
+// ━━ 임시저장 ━━
+async function saveDraft() {
+  const title = $("f_title")?.value?.trim();
+  if (!title) { toast("제목을 입력하세요", "warn"); return; }
+  composeState.title = title;
+  composeState.savedAt = now();
+  composeState.status = "임시저장";
+  // 첨부파일에서 _file 제거 (저장 불가)
+  const draftCopy = JSON.parse(JSON.stringify(composeState, (k,v) => k === "_file" ? undefined : v));
+  draftCopy.attachments = (composeState.attachments||[]).map(a => ({ name: a.name, size: a.size, spPath: a.spPath }));
+  const idx = drafts.findIndex(d => d.id === composeState.id);
+  if (idx >= 0) drafts[idx] = draftCopy;
+  else drafts.push(draftCopy);
+  try {
+    await saveDrafts();
+    toast("임시저장 완료", "success");
+    closeModal("modalCompose");
+    if (curPage === "draft") renderDraftList();
+  } catch (e) {
+    toast("저장 실패: " + e.message, "error");
+  }
+}
+
+// ━━ 결재 상신 ━━
+async function submitApproval() {
+  const title = $("f_title")?.value?.trim();
+  if (!title) { toast("제목을 입력하세요", "warn"); return; }
+  composeState.title = title;
+
+  const f = composeState.formId;
+  const d = composeState.formData;
+  if (f === "VACATION") {
+    if (!d.vacationType || !d.startDate || !d.endDate || !d.reason) { toast("필수 항목을 모두 입력하세요", "warn"); return; }
+  } else if (f === "EXPENSE") {
+    if (!d.expenseType || !d.amount || !d.vendor || !d.reason) { toast("필수 항목을 모두 입력하세요", "warn"); return; }
+  } else if (f === "PURCHASE_REQUEST") {
+    if (!d.totalAmount || !d.reason) { toast("필수 항목을 모두 입력하세요", "warn"); return; }
+  } else if (f === "QUOTE_APPROVAL") {
+    if (!d.customer || !d.quoteAmount || !d.items) { toast("필수 항목을 모두 입력하세요", "warn"); return; }
+  }
+
+  composeState.approvalLine = buildApprovalLine(composeState.formId, myProfile, composeState.formData);
+  if (composeState.approvalLine.length === 0) {
+    toast("결재라인을 생성할 수 없습니다. 상위자 정보를 확인하세요.", "error");
+    return;
+  }
+
+  if (!confirm(`결재를 상신하시겠습니까?\n\n결재라인: ${composeState.approvalLine.map(s=>s.name+" "+s.rank).join(" → ")}`)) return;
+
+  composeState.status = "진행중";
+  composeState.currentStep = 0;
+  composeState.submittedAt = now();
+  composeState.updatedAt = now();
+
+  try {
+    // 첨부파일 업로드
+    if (composeState.attachments.length > 0) {
+      toast("첨부파일 업로드 중...", "info");
+      const yyyy = new Date().getFullYear();
+      const folder = `${APPR_DOC_FOLDER}/${yyyy}/${composeState.formName}/${composeState.id}`;
+      for (let i = 0; i < composeState.attachments.length; i++) {
+        const a = composeState.attachments[i];
+        if (a._file) {
+          const path = `${folder}/${a.name}`;
+          await spUploadFile(path, a._file);
+          a.spPath = path;
+          delete a._file;
+        }
+      }
+    }
+
+    // 직렬화 안전 처리
+    const toSave = JSON.parse(JSON.stringify(composeState, (k,v) => k === "_file" ? undefined : v));
+    approvals.push(toSave);
+    await saveApprovals();
+
+    if (composeState.fromDraft) {
+      drafts = drafts.filter(d => d.id !== composeState.id);
+      await saveDrafts();
+    }
+
+    toast("결재 상신 완료! 첫 결재자에게 전달되었습니다.", "success");
+    closeModal("modalCompose");
+    composeState = null;
+    await reloadAll();
+    go("sent");
+  } catch (e) {
+    toast("상신 실패: " + e.message, "error");
+  }
+}
+
+// ━━ 결재 상세 ━━
+function openDetail(id) {
+  const a = approvals.find(x => x.id === id);
+  if (!a) return;
+  detailState = a;
+  $("detailTitle").textContent = `${a.formIcon || "📄"} ${a.title}`;
+  $("detailBody").innerHTML = renderDetail(a);
+
+  const myEmail = (acct?.username || "").toLowerCase();
+  const isMyTurn = a.status === "진행중" &&
+                   a.approvalLine?.[a.currentStep]?.email?.toLowerCase() === myEmail &&
+                   a.approvalLine?.[a.currentStep]?.status === "대기";
+
+  let footHtml = `<button class="btn" onclick="closeModal('modalDetail')">닫기</button>`;
+  if (isMyTurn) {
+    footHtml = `
+      <input type="text" class="si" id="apprComment" placeholder="결재 의견 (선택)" style="flex:1;margin-right:8px">
+      <button class="btn danger" onclick="doApproval('${a.id}','반려')">✕ 반려</button>
+      <button class="btn success" onclick="doApproval('${a.id}','승인')">✓ 승인</button>
+      <button class="btn" onclick="closeModal('modalDetail')">닫기</button>
+    `;
+  } else if (a.drafter?.email?.toLowerCase() === myEmail && a.status === "진행중") {
+    footHtml = `<button class="btn warn" onclick="cancelApproval('${a.id}')">🚫 결재 회수</button><button class="btn" onclick="closeModal('modalDetail')">닫기</button>`;
+  }
+  $("detailFoot").innerHTML = footHtml;
+  $("modalDetail").classList.add("on");
+}
+
+function renderDetail(a) {
+  let html = `
+    <div class="appr-info">
+      <div class="appr-info-row"><span class="lbl">📋 양식</span><span class="val">${escHtml(a.formName)}</span></div>
+      <div class="appr-info-row"><span class="lbl">🆔 문서번호</span><span class="val" style="font-family:var(--m);font-size:13px">${escHtml(a.id)}</span></div>
+      <div class="appr-info-row"><span class="lbl">👤 기안자</span><span class="val">${escHtml(a.drafter?.name||"")} ${escHtml(a.drafter?.rank||"")} (${escHtml(a.drafter?.dept||"")} · ${escHtml(a.drafter?.team||"")})</span></div>
+      <div class="appr-info-row"><span class="lbl">📅 기안일</span><span class="val">${fmtDT(a.createdAt)}</span></div>
+      <div class="appr-info-row"><span class="lbl">📊 상태</span><span class="val">${stBadge(a.status,"")}</span></div>
+      ${a.urgency === "긴급" ? `<div class="appr-info-row"><span class="lbl">⚡ 긴급도</span><span class="val" style="color:var(--r);font-weight:800">🔥 긴급</span></div>` : ""}
+    </div>
+  `;
+
+  html += `<div style="margin:14px 0"><label class="fl">📋 결재 진행상황</label>
+    ${renderApprovalLine(a.approvalLine, a.currentStep)}
+  </div>`;
+
+  html += `<div class="form-paper"><h3>${a.formIcon||"📄"} ${escHtml(a.formName)}</h3>`;
+  html += renderFormDetail(a);
+  html += `</div>`;
+
+  const comments = a.approvalLine.filter(s => s.comment).map(s =>
+    `<div style="padding:10px;background:var(--bg3);border-radius:8px;margin-bottom:6px">
+      <div style="font-size:12px;color:var(--t3);margin-bottom:3px">${escHtml(s.name)} ${escHtml(s.rank)} · ${fmtDT(s.actionDate)} · ${s.status==="승인"?"✓ 승인":"✕ 반려"}</div>
+      <div style="font-size:14px">${escHtml(s.comment)}</div>
+    </div>`
+  ).join("");
+  if (comments) {
+    html += `<div style="margin-top:14px"><label class="fl">💬 결재 의견</label>${comments}</div>`;
+  }
+
+  if (a.attachments && a.attachments.length > 0) {
+    html += `<div style="margin-top:14px"><label class="fl">📎 첨부파일</label>
+      <div class="atch-list">${a.attachments.map(att =>
+        `<div class="atch-item">📎 <span>${escHtml(att.name)}</span> <span style="color:var(--t3);font-size:12px">(${(att.size/1024).toFixed(1)} KB)</span>${att.spPath ? `<button class="btn sm" style="margin-left:auto" onclick="downloadAttachment('${escHtml(att.spPath)}','${escHtml(att.name)}')">다운로드</button>` : ""}</div>`
+      ).join("")}</div>
+    </div>`;
+  }
+
+  return html;
+}
+
+function renderFormDetail(a) {
+  const d = a.formData || {};
+  if (a.formId === "VACATION") {
+    return `
+      <div class="row2">
+        <div><strong>휴가 종류:</strong> ${escHtml(d.vacationType||"-")}</div>
+        <div><strong>일수:</strong> ${escHtml(d.days||"-")}일</div>
+      </div>
+      <div class="row2" style="margin-top:8px">
+        <div><strong>시작일:</strong> ${escHtml(d.startDate||"-")}</div>
+        <div><strong>종료일:</strong> ${escHtml(d.endDate||"-")}</div>
+      </div>
+      <div style="margin-top:8px"><strong>사유:</strong><br>${escHtml(d.reason||"").replace(/\n/g,"<br>")}</div>
+    `;
+  } else if (a.formId === "EXPENSE") {
+    return `
+      <div class="row2">
+        <div><strong>지출 구분:</strong> ${escHtml(d.expenseType||"-")}</div>
+        <div><strong>지출일:</strong> ${escHtml(d.expenseDate||"-")}</div>
+      </div>
+      <div class="row2" style="margin-top:8px">
+        <div><strong>금액:</strong> ${fmtMoney(d.amount)} 원</div>
+        <div><strong>결제방법:</strong> ${escHtml(d.payMethod||"-")}</div>
+      </div>
+      <div style="margin-top:8px"><strong>거래처:</strong> ${escHtml(d.vendor||"-")}</div>
+      <div style="margin-top:8px"><strong>지출 사유:</strong><br>${escHtml(d.reason||"").replace(/\n/g,"<br>")}</div>
+    `;
+  } else if (a.formId === "PURCHASE_REQUEST") {
+    return `
+      <div class="row2">
+        <div><strong>프로젝트:</strong> ${escHtml(d.pjCode||"-")}</div>
+        <div><strong>PR 코드:</strong> ${escHtml(d.prCode||"-")}</div>
+      </div>
+      <div class="row2" style="margin-top:8px">
+        <div><strong>총 금액:</strong> ${fmtMoney(d.totalAmount)} 원</div>
+        <div><strong>거래처:</strong> ${escHtml(d.vendor||"-")}</div>
+      </div>
+      <div style="margin-top:8px"><strong>필요시점:</strong> ${escHtml(d.dueDate||"-")}</div>
+      <div style="margin-top:8px"><strong>구매 사유:</strong><br>${escHtml(d.reason||"").replace(/\n/g,"<br>")}</div>
+    `;
+  } else if (a.formId === "QUOTE_APPROVAL") {
+    return `
+      <div class="row2">
+        <div><strong>프로젝트:</strong> ${escHtml(d.pjCode||"-")}</div>
+        <div><strong>고객사:</strong> ${escHtml(d.customer||"-")}</div>
+      </div>
+      <div class="row2" style="margin-top:8px">
+        <div><strong>견적 금액:</strong> ${fmtMoney(d.quoteAmount)} 원</div>
+        <div><strong>할인율:</strong> ${escHtml(d.discount||"0")}%</div>
+      </div>
+      <div style="margin-top:8px"><strong>제품/서비스:</strong><br>${escHtml(d.items||"").replace(/\n/g,"<br>")}</div>
+      ${d.reason ? `<div style="margin-top:8px"><strong>특이사항:</strong><br>${escHtml(d.reason).replace(/\n/g,"<br>")}</div>` : ""}
+    `;
+  }
+  return `<pre style="font-size:13px;color:var(--t2)">${escHtml(JSON.stringify(d, null, 2))}</pre>`;
+}
+
+// ━━ 결재 처리 ━━
+async function doApproval(id, action) {
+  const a = approvals.find(x => x.id === id);
+  if (!a) return;
+  const myEmail = (acct?.username || "").toLowerCase();
+  const curStep = a.approvalLine[a.currentStep];
+  if (curStep.email?.toLowerCase() !== myEmail || curStep.status !== "대기") {
+    toast("결재 권한이 없거나 이미 처리되었습니다", "error");
+    return;
+  }
+  const comment = $("apprComment")?.value?.trim() || "";
+  if (action === "반려" && !comment) {
+    if (!confirm("반려 사유 없이 반려하시겠습니까?")) return;
+  }
+  if (!confirm(`${action}하시겠습니까?`)) return;
+
+  curStep.status = action;
+  curStep.actionDate = now();
+  curStep.comment = comment;
+  a.updatedAt = now();
+
+  if (action === "반려") {
+    a.status = "반려";
+  } else {
+    a.currentStep++;
+    if (a.currentStep >= a.approvalLine.length) {
+      a.status = "완료";
+      a.completedAt = now();
+    }
+  }
+
+  try {
+    await saveApprovals();
+    toast(`${action} 처리 완료`, "success");
+    closeModal("modalDetail");
+    await reloadAll();
+  } catch (e) {
+    toast("처리 실패: " + e.message, "error");
+  }
+}
+
+async function cancelApproval(id) {
+  if (!confirm("결재를 회수하시겠습니까? (임시저장으로 돌아갑니다)")) return;
+  const a = approvals.find(x => x.id === id);
+  if (!a) return;
+  if (a.approvalLine.some(s => s.status !== "대기")) {
+    toast("이미 결재가 진행되어 회수할 수 없습니다", "error");
+    return;
+  }
+  approvals = approvals.filter(x => x.id !== id);
+  a.status = "임시저장";
+  a.savedAt = now();
+  drafts.push(a);
+  try {
+    await saveApprovals();
+    await saveDrafts();
+    toast("결재가 회수되어 임시저장함으로 이동했습니다", "success");
+    closeModal("modalDetail");
+    await reloadAll();
+  } catch (e) {
+    toast("회수 실패: " + e.message, "error");
+  }
+}
+
+async function downloadAttachment(path, name) {
+  try {
+    const buf = await spReadFile(path);
+    const blob = new Blob([buf]);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = name;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    toast("다운로드 실패: " + e.message, "error");
+  }
+}
+
+// ━━ 모달 ━━
+function closeModal(id) { $(id).classList.remove("on"); }
+
+// ━━ 재로딩 ━━
+async function reloadAll() {
+  try {
+    await Promise.all([loadApprovals(), loadDrafts()]);
+    if (curPage === "home") renderHome();
+    else if (curPage === "inbox") renderInbox();
+    else if (curPage === "sent") renderSent();
+    else if (curPage === "draft") renderDraftList();
+    updateInboxBadge();
+  } catch (e) {
+    toast("재로딩 실패: " + e.message, "error");
+  }
+}
+
+// ━━ 초기화 ━━
+async function onOK() {
+  $("lm").classList.add("hidden");
+  $("ml").style.display = "flex";
+  $("syncDot").className = "dot";
+  $("syncTxt").textContent = "데이터 로딩...";
+  try {
+    await Promise.all([loadHR(), loadApprovals(), loadDrafts()]);
+    resolveMyProfile();
+    $("syncDot").className = "dot ok";
+    $("syncTxt").textContent = "✅ 동기화 완료";
+    renderHome();
+    updateInboxBadge();
+  } catch (e) {
+    $("syncDot").className = "dot err";
+    $("syncTxt").textContent = "❌ 로드 실패";
+    console.error(e);
+    toast("데이터 로딩 실패: " + e.message, "error");
+  }
+}
+
+// ━━ 시작 ━━
+document.getElementById("btnLogin").addEventListener("click", login);
+initApp();
+</script>
+
+</body>
+</html>
