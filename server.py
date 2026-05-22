@@ -1,3 +1,8 @@
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# ENJET 메일 서버 + 결재 시스템 (v2.0)
+# Last update: 2026-05-22 - Approval routes activated
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 from flask import Flask, jsonify, send_file, request, Response
 import urllib.request
 import urllib.parse
