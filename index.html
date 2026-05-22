@@ -540,6 +540,10 @@ const HR_FILE_PATH = "👥 인사·총무·복지/01.인사/[인사현황] 20260
 
 const SCOPES = ["User.Read","Files.ReadWrite.All","Sites.ReadWrite.All","Chat.ReadWrite","Chat.Read","Mail.Send"];
 
+// ━━ 메일 서버 (Teams 알림 백엔드) ━━
+const MAIL_API_BASE = "https://enjet-mail-api.onrender.com";
+const ENABLE_TEAMS_NOTIFICATION = true; // false로 하면 알림 끔
+
 // ━━ 전역 상태 ━━
 let msal_, acct, spSite, spDrive;
 let hrData = [];
@@ -697,6 +701,101 @@ async function reloadHR() {
   resolveMyProfile();
   if (curPage === "org") renderOrg();
   toast("인사DB 재로딩 완료", "success");
+}
+
+// ━━ Teams 알림 호출 (메일 서버 API) ━━
+async function notifyViaTeams(approvalId, recipientEmail, notifyType = "approval") {
+  if (!ENABLE_TEAMS_NOTIFICATION) return { skipped: true };
+  if (!recipientEmail) return { error: "no recipient" };
+  try {
+    const r = await fetch(`${MAIL_API_BASE}/api/approval/notify`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        approvalId,
+        recipientEmail,
+        notifyType
+      })
+    });
+    if (!r.ok) {
+      const errText = await r.text();
+      console.warn("Teams 알림 실패:", r.status, errText);
+      return { error: `${r.status}: ${errText.substring(0,200)}` };
+    }
+    const result = await r.json();
+    console.log("✅ Teams 알림 발송:", recipientEmail, result);
+    return result;
+  } catch (e) {
+    console.warn("Teams 알림 네트워크 오류:", e.message);
+    return { error: e.message };
+  }
+}
+
+// ━━ HR Picker (참조자 선택용) ━━
+let hrPickerMultiSelect = false;
+let hrPickerCallback = null;
+
+function openHRPicker(callback, multi = false) {
+  if (!hrData || hrData.length === 0) {
+    toast("인사DB가 로드되지 않았습니다", "error");
+    return;
+  }
+  hrPickerCallback = callback;
+  hrPickerMultiSelect = multi;
+  
+  // 부서 필터 초기화
+  const sel = $("hrpickDept");
+  if (sel && sel.options.length <= 1) {
+    const depts = [...new Set(activeHR().map(p => p["부서"]).filter(Boolean))].sort();
+    sel.innerHTML = '<option value="">전체 부서</option>' + depts.map(d => `<option value="${escHtml(d)}">${escHtml(d)}</option>`).join("");
+  }
+  $("hrpickSearch").value = "";
+  renderHRPickList();
+  $("modalHRPick").classList.add("on");
+}
+
+function renderHRPickList() {
+  const q = ($("hrpickSearch")?.value || "").toLowerCase().trim();
+  const deptF = $("hrpickDept")?.value || "";
+  
+  let list = activeHR();
+  if (deptF) list = list.filter(p => p["부서"] === deptF);
+  if (q) list = list.filter(p => [p["성명"],p["부서"],p["팀"],p["직급"],p["ID(email)"]].some(v => String(v||"").toLowerCase().includes(q)));
+  
+  const RANK_ORDER = ["대표","부사장","전무","상무","이사","부장","차장","과장","대리","사원","반장"];
+  list.sort((a,b) => {
+    if (a["부서"] !== b["부서"]) return (a["부서"]||"").localeCompare(b["부서"]||"");
+    return RANK_ORDER.indexOf(a["직급"]) - RANK_ORDER.indexOf(b["직급"]);
+  });
+  list = list.slice(0, 100);
+  
+  if (list.length === 0) {
+    $("hrpickList").innerHTML = `<div style="padding:30px;text-align:center;color:var(--t3)">검색 결과가 없습니다</div>`;
+    return;
+  }
+  
+  const DEPT_COLOR = {"경영전략본부":"#0f4c81","ES사업부":"#1a6bb5","기술연구소":"#00b4d8","미래성장전략팀":"#10b981","리사이클링부문":"#a67c52","구매감사팀":"#d95f00","대표이사":"#c8201e"};
+  
+  $("hrpickList").innerHTML = list.map(p => {
+    const color = DEPT_COLOR[p["부서"]] || "var(--p)";
+    return `<div class="hrpick-row" onclick="selectHRPickPerson('${escHtml(p["ID(email)"])}','${escHtml(p["성명"])}','${escHtml(p["직급"]||'')}','${escHtml(p["부서"]||'')}','${escHtml(p["팀"]||'')}')">
+      <div class="hrpick-avt" style="background:${color}">${escHtml((p["성명"]||"").substring(0,1))}</div>
+      <div style="flex:1;min-width:0">
+        <div class="hrpick-name">${escHtml(p["성명"])} <span style="font-size:12px;color:var(--t3);font-weight:500">${escHtml(p["직급"]||"")}</span></div>
+        <div class="hrpick-meta">${escHtml(p["부서"]||"")} · ${escHtml(p["팀"]||"")}</div>
+        <div class="hrpick-meta" style="font-family:var(--m);font-size:11px">${escHtml(p["ID(email)"]||"")}</div>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+function selectHRPickPerson(email, name, rank, dept, team) {
+  if (hrPickerCallback) {
+    hrPickerCallback({ email, name, rank, dept, team });
+  }
+  if (!hrPickerMultiSelect) {
+    closeModal("modalHRPick");
+  }
 }
 
 function resolveMyProfile() {
@@ -1215,9 +1314,10 @@ function startCompose(formId) {
 
 function openComposeModal() {
   $("composeTitle").textContent = `${composeState.formIcon} ${composeState.formName} 작성`;
+  if (!composeState.ccList) composeState.ccList = [];
   $("composeBody").innerHTML = renderComposeForm();
   $("modalCompose").classList.add("on");
-  setTimeout(() => updateApprovalLine(), 100);
+  setTimeout(() => { updateApprovalLine(); renderCCList(); }, 100);
 }
 
 function renderComposeForm() {
@@ -1602,8 +1702,19 @@ function renderComposeForm() {
       ${formHtml}
     </div>
     <div style="margin-top:18px">
-      <label class="fl">📋 결재라인 (자동 생성)</label>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <label class="fl" style="margin:0">📋 결재라인 <span style="font-weight:400;color:var(--t3);font-size:12px">(드래그로 순서 변경, ✕로 삭제)</span></label>
+        <div style="display:flex;gap:6px">
+          <button type="button" class="btn sm" onclick="openApproverPicker()">+ 결재자 추가</button>
+          <button type="button" class="btn sm" onclick="resetApprovalLine()" title="자동 결재라인으로 초기화">🔄 자동</button>
+        </div>
+      </div>
       <div id="approvalLinePreview"></div>
+    </div>
+    <div style="margin-top:14px">
+      <label class="fl">📎 참조자 <span style="font-weight:400;color:var(--t3);font-size:12px">(결재 완료 시 Teams 알림 수신)</span></label>
+      <div id="ccListPreview"></div>
+      <button type="button" class="btn sm" onclick="openCCPicker()" style="margin-top:6px">+ 참조자 추가</button>
     </div>
     <div style="margin-top:14px">
       <label class="fl">📎 첨부파일</label>
@@ -1614,6 +1725,49 @@ function renderComposeForm() {
       <div class="atch-list" id="atchList"></div>
     </div>
   `;
+}
+
+function openCCPicker() {
+  openHRPicker((person) => {
+    if (!composeState.ccList) composeState.ccList = [];
+    // 중복 체크
+    if (composeState.ccList.some(c => c.email === person.email)) {
+      toast("이미 추가된 참조자입니다", "warn");
+      return;
+    }
+    // 본인 또는 결재자 중복 방지
+    if (person.email === composeState.drafter?.email) {
+      toast("본인은 참조자로 추가할 수 없습니다", "warn");
+      return;
+    }
+    if (composeState.approvalLine?.some(s => s.email === person.email)) {
+      toast("결재자는 참조자로 추가할 수 없습니다", "warn");
+      return;
+    }
+    composeState.ccList.push(person);
+    renderCCList();
+    closeModal("modalHRPick");
+  }, false);
+}
+
+function removeCC(idx) {
+  composeState.ccList.splice(idx, 1);
+  renderCCList();
+}
+
+function renderCCList() {
+  const list = composeState.ccList || [];
+  if (list.length === 0) {
+    $("ccListPreview").innerHTML = `<div style="padding:10px;background:var(--bg3);border-radius:6px;color:var(--t3);font-size:13px">아직 참조자가 없습니다. 결재 완료 시 알림 받을 사람을 추가하세요.</div>`;
+    return;
+  }
+  $("ccListPreview").innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:6px;padding:8px;background:var(--bg3);border-radius:6px">${list.map((cc, i) => 
+    `<div style="display:inline-flex;align-items:center;gap:6px;background:var(--bg2);padding:4px 10px;border-radius:99px;border:1px solid var(--border);font-size:13px">
+      <span style="font-weight:700">${escHtml(cc.name)}</span>
+      <span style="color:var(--t3);font-size:12px">${escHtml(cc.rank||"")} · ${escHtml(cc.dept||"")}</span>
+      <span style="cursor:pointer;color:var(--r);font-weight:700;margin-left:2px" onclick="removeCC(${i})">✕</span>
+    </div>`
+  ).join("")}</div>`;
 }
 
 function toggleHalfDay() {
@@ -1658,16 +1812,24 @@ function calcTripTotal() {
 }
 
 function updateApprovalLine() {
+  // 수동 편집된 항목이 있으면 자동 재생성 안 함 (사용자 의도 보호)
+  const hasManualEdit = composeState.approvalLine?.some(s => s.manual) || composeState.lineEdited;
+  if (hasManualEdit) {
+    redrawApprovalLine();
+    return;
+  }
   const line = buildApprovalLine(composeState.formId, myProfile, composeState.formData);
   composeState.approvalLine = line;
-  const el = $("approvalLinePreview");
-  if (el) el.innerHTML = renderApprovalLine(line, -1);
+  redrawApprovalLine();
 }
 
 function renderApprovalLine(line, currentStep) {
   if (!line || line.length === 0) {
-    return `<div style="padding:14px;background:var(--rd);color:var(--r);border-radius:8px;font-size:13px">⚠️ 결재라인을 생성할 수 없습니다. 인사DB에서 상위자 정보를 확인하세요.</div>`;
+    return `<div style="padding:14px;background:var(--rd);color:var(--r);border-radius:8px;font-size:13px">⚠️ 결재라인이 비어있습니다. <strong>[+ 결재자 추가]</strong> 버튼으로 결재자를 추가하세요.</div>`;
   }
+  // 작성 모달에서 호출인지 (currentStep === -1) 결재 상세에서 호출인지 구분
+  const isEditing = currentStep === -1;
+  
   let html = `<div class="aline">`;
   html += `<div class="astep done">
     <div class="astep-name">${escHtml(myProfile?.["성명"]||"기안자")}</div>
@@ -1681,7 +1843,20 @@ function renderApprovalLine(line, currentStep) {
     if (s.status === "승인") { cls += " done"; statusLabel = "✓ 승인"; }
     else if (s.status === "반려") { cls += " rej"; statusLabel = "✕ 반려"; }
     else if (i === currentStep) { cls += " curr"; statusLabel = "🔔 결재중"; }
-    html += `<div class="${cls}">
+    
+    // 편집 모드에서는 X 버튼 + 드래그 핸들 표시
+    let editBtns = "";
+    if (isEditing) {
+      editBtns = `
+        <div style="position:absolute;top:-7px;right:-7px;display:flex;gap:2px">
+          ${i > 0 ? `<button type="button" onclick="moveApprover(${i},-1)" style="background:var(--bg2);border:1px solid var(--border2);border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:11px;line-height:1;padding:0" title="앞으로">◀</button>` : ""}
+          ${i < line.length - 1 ? `<button type="button" onclick="moveApprover(${i},1)" style="background:var(--bg2);border:1px solid var(--border2);border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:11px;line-height:1;padding:0" title="뒤로">▶</button>` : ""}
+          <button type="button" onclick="removeApprover(${i})" style="background:var(--r);color:#fff;border:none;border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:12px;font-weight:700;line-height:1;padding:0" title="삭제">×</button>
+        </div>`;
+    }
+    
+    html += `<div class="${cls}" style="position:relative">
+      ${editBtns}
       <div class="astep-name">${escHtml(s.name)}</div>
       <div class="astep-rank">${escHtml(s.rank)} · ${escHtml(s.dept)}</div>
       <div class="astep-status">${statusLabel}</div>
@@ -1689,6 +1864,76 @@ function renderApprovalLine(line, currentStep) {
   });
   html += `</div>`;
   return html;
+}
+
+// ━━ 결재라인 편집 ━━
+function openApproverPicker() {
+  openHRPicker((person) => {
+    if (!composeState.approvalLine) composeState.approvalLine = [];
+    // 중복 체크
+    if (composeState.approvalLine.some(s => s.email === person.email)) {
+      toast("이미 결재라인에 있는 사람입니다", "warn");
+      return;
+    }
+    // 본인이 결재자에 자기 자신 추가 가능 (셀프 결재 케이스)
+    // 참조자 중복 방지
+    if (composeState.ccList?.some(c => c.email === person.email)) {
+      toast("참조자에 있는 사람은 결재자로 추가할 수 없습니다. 참조자에서 먼저 제거하세요.", "warn");
+      return;
+    }
+    composeState.approvalLine.push({
+      step: composeState.approvalLine.length + 1,
+      email: person.email,
+      name: person.name,
+      rank: person.rank,
+      dept: person.dept,
+      team: person.team || "",
+      status: "대기",
+      actionDate: null,
+      comment: "",
+      manual: true  // 수동 추가 표시
+    });
+    // step 재정렬
+    composeState.approvalLine.forEach((s, i) => s.step = i + 1);
+    redrawApprovalLine();
+    closeModal("modalHRPick");
+    toast(`${person.name} ${person.rank} 추가됨`, "success");
+  }, false);
+}
+
+function removeApprover(idx) {
+  if (!composeState.approvalLine || idx < 0 || idx >= composeState.approvalLine.length) return;
+  const removed = composeState.approvalLine[idx];
+  if (!confirm(`${removed.name} ${removed.rank}을(를) 결재라인에서 제외하시겠습니까?`)) return;
+  composeState.approvalLine.splice(idx, 1);
+  composeState.approvalLine.forEach((s, i) => s.step = i + 1);
+  composeState.lineEdited = true; // 수동 편집 표시
+  redrawApprovalLine();
+}
+
+function moveApprover(idx, direction) {
+  if (!composeState.approvalLine) return;
+  const newIdx = idx + direction;
+  if (newIdx < 0 || newIdx >= composeState.approvalLine.length) return;
+  const arr = composeState.approvalLine;
+  [arr[idx], arr[newIdx]] = [arr[newIdx], arr[idx]];
+  arr.forEach((s, i) => s.step = i + 1);
+  composeState.lineEdited = true; // 수동 편집 표시
+  redrawApprovalLine();
+}
+
+function resetApprovalLine() {
+  if (!confirm("자동 생성 결재라인으로 초기화하시겠습니까?\n(수동으로 추가/삭제한 내용이 사라집니다)")) return;
+  composeState.lineEdited = false; // 자동 갱신 다시 허용
+  const line = buildApprovalLine(composeState.formId, myProfile, composeState.formData);
+  composeState.approvalLine = line;
+  redrawApprovalLine();
+  toast("자동 결재라인으로 초기화됨", "success");
+}
+
+function redrawApprovalLine() {
+  const el = $("approvalLinePreview");
+  if (el) el.innerHTML = renderApprovalLine(composeState.approvalLine, -1);
 }
 
 // ━━ 첨부파일 ━━
@@ -1766,9 +2011,13 @@ async function submitApproval() {
     }
   }
 
-  composeState.approvalLine = buildApprovalLine(composeState.formId, myProfile, composeState.formData);
+  // 결재라인 검증 (수동 편집된 경우 그대로 사용, 아니면 자동 재생성)
+  const hasManualEdit = composeState.approvalLine?.some(s => s.manual) || composeState.lineEdited;
+  if (!hasManualEdit) {
+    composeState.approvalLine = buildApprovalLine(composeState.formId, myProfile, composeState.formData);
+  }
   if (composeState.approvalLine.length === 0) {
-    toast("결재라인을 생성할 수 없습니다. 상위자 정보를 확인하세요.", "error");
+    toast("결재라인이 비어있습니다. 결재자를 추가하세요.", "error");
     return;
   }
 
@@ -1806,7 +2055,19 @@ async function submitApproval() {
       await saveDrafts();
     }
 
-    toast("결재 상신 완료! 첫 결재자에게 전달되었습니다.", "success");
+    // Teams 첫 결재자에게 알림 발송
+    const firstApprover = composeState.approvalLine[0];
+    if (firstApprover && firstApprover.email) {
+      toast("Teams 알림 발송 중...", "info");
+      const notifyResult = await notifyViaTeams(composeState.id, firstApprover.email, "approval");
+      if (notifyResult.success) {
+        toast(`✅ Teams 알림 전송 완료 (${firstApprover.name} ${firstApprover.rank})`, "success");
+      } else if (notifyResult.error) {
+        toast(`⚠️ 결재는 상신되었으나 Teams 알림 실패: ${notifyResult.error.substring(0,100)}`, "warn");
+      }
+    }
+
+    toast("결재 상신 완료!", "success");
     closeModal("modalCompose");
     composeState = null;
     await reloadAll();
@@ -1838,10 +2099,34 @@ function openDetail(id) {
       <button class="btn" onclick="closeModal('modalDetail')">닫기</button>
     `;
   } else if (a.drafter?.email?.toLowerCase() === myEmail && a.status === "진행중") {
-    footHtml = `<button class="btn warn" onclick="cancelApproval('${a.id}')">🚫 결재 회수</button><button class="btn" onclick="closeModal('modalDetail')">닫기</button>`;
+    footHtml = `<button class="btn" onclick="resendTeamsNotification('${a.id}')">🔔 Teams 재알림</button><button class="btn warn" onclick="cancelApproval('${a.id}')">🚫 결재 회수</button><button class="btn" onclick="closeModal('modalDetail')">닫기</button>`;
   }
   $("detailFoot").innerHTML = footHtml;
   $("modalDetail").classList.add("on");
+}
+
+async function resendTeamsNotification(approvalId) {
+  const a = approvals.find(x => x.id === approvalId);
+  if (!a) return;
+  const cur = a.approvalLine?.[a.currentStep];
+  if (!cur) return;
+  if (!confirm(`${cur.name} ${cur.rank}님에게 Teams 알림을 다시 보낼까요?`)) return;
+  
+  toast("Teams 재알림 발송 중...", "info");
+  try {
+    const r = await fetch(`${MAIL_API_BASE}/api/approval/resend`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ approvalId })
+    });
+    if (r.ok) {
+      toast(`✅ ${cur.name}님에게 Teams 알림 재발송`, "success");
+    } else {
+      toast("재알림 실패: " + r.status, "error");
+    }
+  } catch (e) {
+    toast("재알림 오류: " + e.message, "error");
+  }
 }
 
 function renderDetail(a) {
@@ -1878,6 +2163,15 @@ function renderDetail(a) {
     html += `<div style="margin-top:14px"><label class="fl">📎 첨부파일</label>
       <div class="atch-list">${a.attachments.map(att =>
         `<div class="atch-item">📎 <span>${escHtml(att.name)}</span> <span style="color:var(--t3);font-size:12px">(${(att.size/1024).toFixed(1)} KB)</span>${att.spPath ? `<button class="btn sm" style="margin-left:auto" onclick="downloadAttachment('${escHtml(att.spPath)}','${escHtml(att.name)}')">다운로드</button>` : ""}</div>`
+      ).join("")}</div>
+    </div>`;
+  }
+
+  // 참조자 표시
+  if (a.ccList && a.ccList.length > 0) {
+    html += `<div style="margin-top:14px"><label class="fl">📋 참조자</label>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;padding:8px;background:var(--bg3);border-radius:6px">${a.ccList.map(cc => 
+        `<div style="background:var(--bg2);padding:4px 10px;border-radius:99px;border:1px solid var(--border);font-size:13px"><strong>${escHtml(cc.name)}</strong> <span style="color:var(--t3);font-size:12px">${escHtml(cc.rank||"")} · ${escHtml(cc.dept||"")}</span></div>`
       ).join("")}</div>
     </div>`;
   }
@@ -2039,6 +2333,28 @@ async function doApproval(id, action) {
 
   try {
     await saveApprovals();
+    
+    // Teams 알림 발송
+    if (action === "반려") {
+      // 기안자에게 반려 알림
+      notifyViaTeams(a.id, a.drafter.email, "rejected").catch(e => console.warn(e));
+    } else if (a.status === "완료") {
+      // 기안자에게 완료 알림
+      notifyViaTeams(a.id, a.drafter.email, "complete").catch(e => console.warn(e));
+      // 참조자에게 참조 알림
+      if (a.ccList && a.ccList.length > 0) {
+        a.ccList.forEach(cc => {
+          notifyViaTeams(a.id, cc.email, "cc").catch(e => console.warn(e));
+        });
+      }
+    } else {
+      // 다음 결재자에게 알림
+      const nextApprover = a.approvalLine[a.currentStep];
+      if (nextApprover && nextApprover.email) {
+        notifyViaTeams(a.id, nextApprover.email, "approval").catch(e => console.warn(e));
+      }
+    }
+    
     toast(`${action} 처리 완료`, "success");
     closeModal("modalDetail");
     await reloadAll();
