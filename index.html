@@ -764,6 +764,28 @@ function buildApprovalLine(formId, drafter, formData) {
   };
   
   if (formId === "VACATION") {
+    // 다우오피스 패턴: 직속상사 → 대표이사
+    // 단, 사용자가 임원급(전무/이사 이상)이면 → 바로 대표이사
+    const drafterRank = drafter["직급"] || "";
+    const isExecutive = ["대표","부사장","전무","상무","이사"].includes(drafterRank);
+    
+    if (!isExecutive) {
+      addUnique(findPersonByName(drafter["상위자"]));
+    }
+    // 부서장(본부장급) - 상위자가 이미 부서장이면 스킵
+    const deptHead = findDeptHead(drafter["부서"]);
+    if (deptHead && !["대표"].includes(deptHead["직급"])) {
+      addUnique(deptHead);
+    }
+    // 최종 대표이사
+    addUnique(findCEO());
+  } else if (formId === "BIZ_TRIP") {
+    // 출장신청: 상사 → 부서장 → CEO
+    addUnique(findPersonByName(drafter["상위자"]));
+    addUnique(findDeptHead(drafter["부서"]));
+    addUnique(findCEO());
+  } else if (formId === "BIZ_TRIP_REPORT") {
+    // 출장결과보고서: 상사 → 부서장
     addUnique(findPersonByName(drafter["상위자"]));
     addUnique(findDeptHead(drafter["부서"]));
   } else if (formId === "EXPENSE") {
@@ -828,6 +850,8 @@ const FORM_TEMPLATES = [
   { id: "EXPENSE", name: "지출결의서(엔젯)", category: "회계", icon: "💵", phase: 1 },
   { id: "PURCHASE_REQUEST", name: "구매품의서", category: "구매", icon: "🛒", phase: 1 },
   { id: "QUOTE_APPROVAL", name: "견적승인", category: "영업", icon: "💼", phase: 1 },
+  { id: "BIZ_TRIP", name: "출장신청", category: "출장", icon: "✈️", phase: 1 },
+  { id: "BIZ_TRIP_REPORT", name: "출장결과보고서", category: "출장", icon: "📝", phase: 1 },
   // Phase 2 - 다우오피스 양식 목록 (준비중)
   { id: "VACATION_PREGNANT", name: "임산부 근로시간 단축 신청서", category: "근태", phase: 2 },
   { id: "QUOTE_CUSTOMER", name: "견적서(고객사 제출)", category: "영업", phase: 2 },
@@ -850,8 +874,6 @@ const FORM_TEMPLATES = [
   { id: "NEW_VENDOR", name: "신규거래처등록신청", category: "회계", phase: 2 },
   { id: "FUND_REPORT", name: "자금일보", category: "회계", phase: 2 },
   { id: "FUEL_REIMB", name: "차량 유류비 정산서", category: "출장", phase: 2 },
-  { id: "BIZ_TRIP", name: "출장신청", category: "출장", phase: 2 },
-  { id: "BIZ_TRIP_REPORT", name: "출장결과보고서", category: "출장", phase: 2 },
   { id: "OUT_FIELD", name: "외근신청서", category: "출장", phase: 2 },
   { id: "SAFETY_WORK", name: "안전 작업 허가 신청서", category: "일반", phase: 2 },
   { id: "CARD_LIMIT", name: "법인카드 증액 신청서", category: "회계", phase: 2 },
@@ -1207,14 +1229,14 @@ function renderComposeForm() {
       <div class="row2">
         <div class="fg">
           <label class="fl">휴가 종류<span class="req">*</span></label>
-          <select class="ss" id="f_vacationType" onchange="composeState.formData.vacationType=this.value">
+          <select class="ss" id="f_vacationType" onchange="composeState.formData.vacationType=this.value;toggleHalfDay()">
             <option value="">선택</option>
             <option value="연차" ${f.formData.vacationType==="연차"?"selected":""}>연차</option>
-            <option value="반차(오전)" ${f.formData.vacationType==="반차(오전)"?"selected":""}>반차(오전)</option>
-            <option value="반차(오후)" ${f.formData.vacationType==="반차(오후)"?"selected":""}>반차(오후)</option>
+            <option value="반차" ${f.formData.vacationType==="반차"?"selected":""}>반차</option>
             <option value="병가" ${f.formData.vacationType==="병가"?"selected":""}>병가</option>
-            <option value="공가" ${f.formData.vacationType==="공가"?"selected":""}>공가</option>
+            <option value="공가(예비군/민방위)" ${f.formData.vacationType==="공가(예비군/민방위)"?"selected":""}>공가(예비군/민방위)</option>
             <option value="경조휴가" ${f.formData.vacationType==="경조휴가"?"selected":""}>경조휴가</option>
+            <option value="포상휴가" ${f.formData.vacationType==="포상휴가"?"selected":""}>포상휴가</option>
             <option value="기타" ${f.formData.vacationType==="기타"?"selected":""}>기타</option>
           </select>
         </div>
@@ -1236,13 +1258,51 @@ function renderComposeForm() {
           <input type="date" class="si" id="f_endDate" value="${f.formData.endDate||''}" onchange="composeState.formData.endDate=this.value;calcVacationDays()">
         </div>
       </div>
-      <div class="fg">
-        <label class="fl">일수</label>
-        <input type="text" class="si" id="f_days" readonly placeholder="자동 계산" value="${f.formData.days?f.formData.days+'일':''}">
+      <div id="halfDayBlock" style="display:${f.formData.vacationType==="반차"?'block':'none'};background:var(--bg3);padding:10px;border-radius:8px;margin-bottom:12px">
+        <label class="fl">반차 시간대<span class="req">*</span></label>
+        <div class="row2">
+          <div>
+            <div style="font-size:12px;color:var(--t3);margin-bottom:4px">시작일</div>
+            <select class="ss" id="f_halfStart" onchange="composeState.formData.halfStart=this.value">
+              <option value="">선택</option>
+              <option value="오전前" ${f.formData.halfStart==="오전前"?"selected":""}>오전前 (08:00~10:00)</option>
+              <option value="오전後" ${f.formData.halfStart==="오전後"?"selected":""}>오전後 (10:00~12:00)</option>
+              <option value="오후前" ${f.formData.halfStart==="오후前"?"selected":""}>오후前 (13:00~15:00)</option>
+              <option value="오후後" ${f.formData.halfStart==="오후後"?"selected":""}>오후後 (15:00~17:00)</option>
+            </select>
+          </div>
+          <div>
+            <div style="font-size:12px;color:var(--t3);margin-bottom:4px">종료일</div>
+            <select class="ss" id="f_halfEnd" onchange="composeState.formData.halfEnd=this.value">
+              <option value="">선택</option>
+              <option value="오전前" ${f.formData.halfEnd==="오전前"?"selected":""}>오전前</option>
+              <option value="오전後" ${f.formData.halfEnd==="오전後"?"selected":""}>오전後</option>
+              <option value="오후前" ${f.formData.halfEnd==="오후前"?"selected":""}>오후前</option>
+              <option value="오후後" ${f.formData.halfEnd==="오후後"?"selected":""}>오후後</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="row2">
+        <div class="fg">
+          <label class="fl">신청 일수</label>
+          <input type="text" class="si" id="f_days" readonly placeholder="자동 계산" value="${f.formData.days?f.formData.days+'일':''}">
+        </div>
+        <div class="fg">
+          <label class="fl">잔여 연차 (참고용)</label>
+          <input type="number" step="0.5" class="si" id="f_remainDays" placeholder="예: 6.5" value="${f.formData.remainDays||''}" onchange="composeState.formData.remainDays=this.value">
+        </div>
       </div>
       <div class="fg">
-        <label class="fl">사유<span class="req">*</span></label>
+        <label class="fl">휴가 사유<span class="req">*</span></label>
         <textarea class="ta" id="f_reason" onchange="composeState.formData.reason=this.value">${escHtml(f.formData.reason||'')}</textarea>
+      </div>
+      <div style="margin-top:8px;padding:10px;background:var(--yd);border-left:3px solid var(--y);border-radius:6px;font-size:12px;color:var(--y);line-height:1.6">
+        ⚠️ <strong>휴가 안내</strong><br>
+        1. 연차는 전년도 발생 잔여 연차 한도 내 사용 (입사 1년 미만은 월 1개 발생)<br>
+        2. 경조사 휴가는 가족관계증명서/등본/청첩장 등 증빙 제출<br>
+        3. 공가(예비군/민방위)는 사후 참석증 반드시 제출<br>
+        4. 긴급한 사유가 아닌 한 사용일 <strong>최소 3일 전</strong> 상신 원칙
       </div>
     `;
   } else if (f.formId === "EXPENSE") {
@@ -1355,6 +1415,181 @@ function renderComposeForm() {
         <textarea class="ta" id="f_reason" onchange="composeState.formData.reason=this.value">${escHtml(f.formData.reason||'')}</textarea>
       </div>
     `;
+  } else if (f.formId === "BIZ_TRIP") {
+    formHtml = `
+      <div class="row2">
+        <div class="fg">
+          <label class="fl">출장 구분<span class="req">*</span></label>
+          <select class="ss" id="f_tripType" onchange="composeState.formData.tripType=this.value">
+            <option value="">선택</option>
+            <option value="국내" ${f.formData.tripType==="국내"?"selected":""}>국내</option>
+            <option value="해외" ${f.formData.tripType==="해외"?"selected":""}>해외</option>
+            <option value="장기" ${f.formData.tripType==="장기"?"selected":""}>장기 (7일 이상)</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label class="fl">관련 프로젝트</label>
+          <input type="text" class="si" id="f_project" placeholder="예: 초격차프로젝트" value="${escHtml(f.formData.project||'')}" onchange="composeState.formData.project=this.value">
+        </div>
+      </div>
+      <div class="row2">
+        <div class="fg">
+          <label class="fl">출장 시작일<span class="req">*</span></label>
+          <input type="date" class="si" id="f_tripStart" value="${f.formData.tripStart||''}" onchange="composeState.formData.tripStart=this.value;calcTripDays()">
+        </div>
+        <div class="fg">
+          <label class="fl">출장 종료일<span class="req">*</span></label>
+          <input type="date" class="si" id="f_tripEnd" value="${f.formData.tripEnd||''}" onchange="composeState.formData.tripEnd=this.value;calcTripDays()">
+        </div>
+      </div>
+      <div class="row2">
+        <div class="fg">
+          <label class="fl">출장 일수</label>
+          <input type="text" class="si" id="f_tripDays" readonly placeholder="자동 계산" value="${f.formData.tripDays?f.formData.tripDays+'일':''}">
+        </div>
+        <div class="fg">
+          <label class="fl">출장지<span class="req">*</span></label>
+          <input type="text" class="si" id="f_tripLocation" placeholder="예: 제주, 서울 강남" value="${escHtml(f.formData.tripLocation||'')}" onchange="composeState.formData.tripLocation=this.value">
+        </div>
+      </div>
+      <div class="fg">
+        <label class="fl">출장 목적<span class="req">*</span></label>
+        <textarea class="ta" id="f_tripPurpose" placeholder="예: 1. 고객사 미팅, 2. 전시회 참석" onchange="composeState.formData.tripPurpose=this.value">${escHtml(f.formData.tripPurpose||'')}</textarea>
+      </div>
+      <div class="fg">
+        <label class="fl">출장자 정보 (다명일 경우 줄바꿈으로 추가)</label>
+        <textarea class="ta" id="f_travelers" placeholder="예시:&#10;성백훈 / 전무 / 010-1234-5678&#10;김한나 / 과장 / 010-2345-6789" onchange="composeState.formData.travelers=this.value">${escHtml(f.formData.travelers || (myProfile ? `${myProfile["성명"]} / ${myProfile["직급"]} / ` : ''))}</textarea>
+      </div>
+      <div class="form-paper" style="margin-top:14px;background:var(--bg3)">
+        <h3>🚗 출장 일정 / 교통편</h3>
+        <div class="fg">
+          <label class="fl">출발 정보</label>
+          <div class="row2">
+            <input type="datetime-local" class="si" id="f_departDt" value="${f.formData.departDt||''}" onchange="composeState.formData.departDt=this.value">
+            <select class="ss" id="f_transport" onchange="composeState.formData.transport=this.value">
+              <option value="">교통편 선택</option>
+              <option value="항공" ${f.formData.transport==="항공"?"selected":""}>✈️ 항공</option>
+              <option value="KTX/기차" ${f.formData.transport==="KTX/기차"?"selected":""}>🚄 KTX/기차</option>
+              <option value="고속버스" ${f.formData.transport==="고속버스"?"selected":""}>🚌 고속버스</option>
+              <option value="자가용" ${f.formData.transport==="자가용"?"selected":""}>🚗 자가용</option>
+              <option value="법인차량" ${f.formData.transport==="법인차량"?"selected":""}>🚙 법인차량</option>
+              <option value="택시" ${f.formData.transport==="택시"?"selected":""}>🚕 택시</option>
+              <option value="기타" ${f.formData.transport==="기타"?"selected":""}>기타</option>
+            </select>
+          </div>
+        </div>
+        <div class="fg">
+          <label class="fl">복귀 정보</label>
+          <input type="datetime-local" class="si" id="f_returnDt" value="${f.formData.returnDt||''}" onchange="composeState.formData.returnDt=this.value">
+        </div>
+      </div>
+      <div class="form-paper" style="margin-top:14px;background:var(--bg3)">
+        <h3>💰 출장 예산 (예상)</h3>
+        <div class="row2">
+          <div class="fg">
+            <label class="fl">숙박비</label>
+            <input type="number" class="si" id="f_costLodging" placeholder="0" value="${f.formData.costLodging||''}" onchange="composeState.formData.costLodging=this.value;calcTripTotal()">
+          </div>
+          <div class="fg">
+            <label class="fl">일비 (식대 등)</label>
+            <input type="number" class="si" id="f_costDaily" placeholder="0" value="${f.formData.costDaily||''}" onchange="composeState.formData.costDaily=this.value;calcTripTotal()">
+          </div>
+        </div>
+        <div class="row2">
+          <div class="fg">
+            <label class="fl">교통비</label>
+            <input type="number" class="si" id="f_costTransport" placeholder="0" value="${f.formData.costTransport||''}" onchange="composeState.formData.costTransport=this.value;calcTripTotal()">
+          </div>
+          <div class="fg">
+            <label class="fl">기타비용</label>
+            <input type="number" class="si" id="f_costEtc" placeholder="0" value="${f.formData.costEtc||''}" onchange="composeState.formData.costEtc=this.value;calcTripTotal()">
+          </div>
+        </div>
+        <div class="fg">
+          <label class="fl">총 예상 비용</label>
+          <input type="text" class="si" id="f_costTotal" readonly value="${fmtMoney(f.formData.costTotal||0)} 원" style="font-weight:700;background:var(--pd);color:var(--p)">
+        </div>
+        <div class="fg">
+          <label class="fl">결제 방법 (지급 형태)</label>
+          <select class="ss" id="f_paymentType" onchange="composeState.formData.paymentType=this.value">
+            <option value="실비정산" ${f.formData.paymentType==="실비정산"?"selected":""}>실비정산 (사후)</option>
+            <option value="기지급" ${f.formData.paymentType==="기지급"?"selected":""}>기지급 (선지급)</option>
+            <option value="법인카드" ${f.formData.paymentType==="법인카드"?"selected":""}>법인카드</option>
+            <option value="혼합" ${f.formData.paymentType==="혼합"?"selected":""}>혼합</option>
+          </select>
+        </div>
+      </div>
+      <div class="fg" style="margin-top:14px">
+        <label class="fl">비고 / 특이사항</label>
+        <textarea class="ta" id="f_note" placeholder="추가 정보 (예: 출장기간 내 일정 변경, 동행자 변경 가능성 등)" onchange="composeState.formData.note=this.value">${escHtml(f.formData.note||'')}</textarea>
+      </div>
+      <div style="margin-top:8px;padding:10px;background:var(--ad);border-left:3px solid var(--a);border-radius:6px;font-size:12px;color:var(--a);line-height:1.6">
+        ⚠️ <strong>출장 안내</strong><br>
+        1. 출장 후 <strong>5일 이내</strong> 출장결과보고서 + 비용 정산서 제출 의무<br>
+        2. 법인카드 사용 시 영수증 별도 제출<br>
+        3. 해외 출장은 출장 <strong>2주 전</strong> 상신 권장 (비자/항공권 확보)<br>
+        4. 변경사항 발생 시 즉시 결재선에 통지
+      </div>
+    `;
+  } else if (f.formId === "BIZ_TRIP_REPORT") {
+    formHtml = `
+      <div class="fg">
+        <label class="fl">관련 출장신청 문서번호</label>
+        <input type="text" class="si" id="f_tripRefId" placeholder="예: AP-260520-123 (해당 출장신청 ID)" value="${escHtml(f.formData.tripRefId||'')}" onchange="composeState.formData.tripRefId=this.value">
+        <div style="font-size:12px;color:var(--t3);margin-top:4px">📦 Phase 2: 출장신청서와 자동 연결 예정</div>
+      </div>
+      <div class="row2">
+        <div class="fg">
+          <label class="fl">출장 시작일<span class="req">*</span></label>
+          <input type="date" class="si" id="f_tripStart" value="${f.formData.tripStart||''}" onchange="composeState.formData.tripStart=this.value">
+        </div>
+        <div class="fg">
+          <label class="fl">출장 종료일<span class="req">*</span></label>
+          <input type="date" class="si" id="f_tripEnd" value="${f.formData.tripEnd||''}" onchange="composeState.formData.tripEnd=this.value">
+        </div>
+      </div>
+      <div class="fg">
+        <label class="fl">출장지 / 방문처<span class="req">*</span></label>
+        <input type="text" class="si" id="f_tripLocation" value="${escHtml(f.formData.tripLocation||'')}" onchange="composeState.formData.tripLocation=this.value">
+      </div>
+      <div class="fg">
+        <label class="fl">방문 회사 / 담당자</label>
+        <textarea class="ta" id="f_contact" placeholder="예시:&#10;ABC전자 - 김부장 (010-xxxx-xxxx)&#10;XYZ산업 - 이과장" onchange="composeState.formData.contact=this.value">${escHtml(f.formData.contact||'')}</textarea>
+      </div>
+      <div class="fg">
+        <label class="fl">주요 활동 내역<span class="req">*</span></label>
+        <textarea class="ta" id="f_activities" placeholder="일자별 주요 활동을 기록해주세요" onchange="composeState.formData.activities=this.value" style="min-height:120px">${escHtml(f.formData.activities||'')}</textarea>
+      </div>
+      <div class="fg">
+        <label class="fl">성과 / 결과<span class="req">*</span></label>
+        <textarea class="ta" id="f_results" placeholder="달성한 목표, 도출된 결과, 합의 사항 등" onchange="composeState.formData.results=this.value">${escHtml(f.formData.results||'')}</textarea>
+      </div>
+      <div class="fg">
+        <label class="fl">후속 조치사항</label>
+        <textarea class="ta" id="f_followup" placeholder="누가, 언제까지, 무엇을 해야 하는지" onchange="composeState.formData.followup=this.value">${escHtml(f.formData.followup||'')}</textarea>
+      </div>
+      <div class="form-paper" style="margin-top:14px;background:var(--bg3)">
+        <h3>💰 정산 내역</h3>
+        <div class="row2">
+          <div class="fg">
+            <label class="fl">기 신청 예산</label>
+            <input type="number" class="si" id="f_budgetPlanned" placeholder="0" value="${f.formData.budgetPlanned||''}" onchange="composeState.formData.budgetPlanned=this.value">
+          </div>
+          <div class="fg">
+            <label class="fl">실제 사용액</label>
+            <input type="number" class="si" id="f_budgetActual" placeholder="0" value="${f.formData.budgetActual||''}" onchange="composeState.formData.budgetActual=this.value">
+          </div>
+        </div>
+        <div class="fg">
+          <label class="fl">정산 의견</label>
+          <textarea class="ta" id="f_budgetNote" placeholder="예: 환차로 약 5만원 추가 발생, 영수증 첨부" onchange="composeState.formData.budgetNote=this.value">${escHtml(f.formData.budgetNote||'')}</textarea>
+        </div>
+      </div>
+      <div style="margin-top:8px;padding:10px;background:var(--pd);border-left:3px solid var(--p);border-radius:6px;font-size:12px;color:var(--p);line-height:1.6">
+        💡 <strong>안내</strong><br>
+        영수증, 출장 사진, 명함 등 증빙은 <strong>첨부파일</strong>로 추가해주세요.
+      </div>
+    `;
   }
 
   return `
@@ -1381,15 +1616,45 @@ function renderComposeForm() {
   `;
 }
 
+function toggleHalfDay() {
+  const t = $("f_vacationType")?.value;
+  const block = $("halfDayBlock");
+  if (block) block.style.display = (t === "반차") ? "block" : "none";
+  calcVacationDays();
+}
+
 function calcVacationDays() {
   const s = $("f_startDate")?.value;
   const e = $("f_endDate")?.value;
+  const type = $("f_vacationType")?.value;
   if (!s || !e) return;
   const sd = new Date(s), ed = new Date(e);
   if (ed < sd) { $("f_days").value = "잘못된 기간"; return; }
-  const diff = Math.ceil((ed - sd) / (1000*60*60*24)) + 1;
+  let diff = Math.ceil((ed - sd) / (1000*60*60*24)) + 1;
+  if (type === "반차") diff = 0.5;
   $("f_days").value = diff + "일";
   composeState.formData.days = diff;
+}
+
+function calcTripDays() {
+  const s = $("f_tripStart")?.value;
+  const e = $("f_tripEnd")?.value;
+  if (!s || !e) return;
+  const sd = new Date(s), ed = new Date(e);
+  if (ed < sd) { $("f_tripDays").value = "잘못된 기간"; return; }
+  const diff = Math.ceil((ed - sd) / (1000*60*60*24)) + 1;
+  $("f_tripDays").value = diff + "일";
+  composeState.formData.tripDays = diff;
+}
+
+function calcTripTotal() {
+  const l = parseFloat($("f_costLodging")?.value || 0);
+  const d = parseFloat($("f_costDaily")?.value || 0);
+  const t = parseFloat($("f_costTransport")?.value || 0);
+  const e = parseFloat($("f_costEtc")?.value || 0);
+  const total = l + d + t + e;
+  composeState.formData.costTotal = total;
+  if ($("f_costTotal")) $("f_costTotal").value = fmtMoney(total) + " 원";
 }
 
 function updateApprovalLine() {
@@ -1484,12 +1749,21 @@ async function submitApproval() {
   const d = composeState.formData;
   if (f === "VACATION") {
     if (!d.vacationType || !d.startDate || !d.endDate || !d.reason) { toast("필수 항목을 모두 입력하세요", "warn"); return; }
+    if (d.vacationType === "반차" && (!d.halfStart || !d.halfEnd)) { toast("반차 시간대를 선택하세요", "warn"); return; }
   } else if (f === "EXPENSE") {
     if (!d.expenseType || !d.amount || !d.vendor || !d.reason) { toast("필수 항목을 모두 입력하세요", "warn"); return; }
   } else if (f === "PURCHASE_REQUEST") {
     if (!d.totalAmount || !d.reason) { toast("필수 항목을 모두 입력하세요", "warn"); return; }
   } else if (f === "QUOTE_APPROVAL") {
     if (!d.customer || !d.quoteAmount || !d.items) { toast("필수 항목을 모두 입력하세요", "warn"); return; }
+  } else if (f === "BIZ_TRIP") {
+    if (!d.tripType || !d.tripStart || !d.tripEnd || !d.tripLocation || !d.tripPurpose) {
+      toast("필수 항목을 모두 입력하세요 (출장구분/일자/출장지/목적)", "warn"); return;
+    }
+  } else if (f === "BIZ_TRIP_REPORT") {
+    if (!d.tripStart || !d.tripEnd || !d.tripLocation || !d.activities || !d.results) {
+      toast("필수 항목을 모두 입력하세요 (일자/출장지/활동내역/성과)", "warn"); return;
+    }
   }
 
   composeState.approvalLine = buildApprovalLine(composeState.formId, myProfile, composeState.formData);
@@ -1616,8 +1890,8 @@ function renderFormDetail(a) {
   if (a.formId === "VACATION") {
     return `
       <div class="row2">
-        <div><strong>휴가 종류:</strong> ${escHtml(d.vacationType||"-")}</div>
-        <div><strong>일수:</strong> ${escHtml(d.days||"-")}일</div>
+        <div><strong>휴가 종류:</strong> ${escHtml(d.vacationType||"-")}${d.vacationType==="반차"?` <span style="color:var(--t3);font-size:13px">(${escHtml(d.halfStart||"-")} ~ ${escHtml(d.halfEnd||"-")})</span>`:""}</div>
+        <div><strong>일수:</strong> ${escHtml(d.days||"-")}일${d.remainDays?` <span style="color:var(--t3);font-size:13px">(잔여: ${escHtml(d.remainDays)}일)</span>`:""}</div>
       </div>
       <div class="row2" style="margin-top:8px">
         <div><strong>시작일:</strong> ${escHtml(d.startDate||"-")}</div>
@@ -1663,6 +1937,70 @@ function renderFormDetail(a) {
       </div>
       <div style="margin-top:8px"><strong>제품/서비스:</strong><br>${escHtml(d.items||"").replace(/\n/g,"<br>")}</div>
       ${d.reason ? `<div style="margin-top:8px"><strong>특이사항:</strong><br>${escHtml(d.reason).replace(/\n/g,"<br>")}</div>` : ""}
+    `;
+  } else if (a.formId === "BIZ_TRIP") {
+    return `
+      <div class="row2">
+        <div><strong>출장 구분:</strong> ${escHtml(d.tripType||"-")}</div>
+        <div><strong>출장 일수:</strong> ${escHtml(d.tripDays||"-")}일</div>
+      </div>
+      <div class="row2" style="margin-top:8px">
+        <div><strong>출장 시작:</strong> ${escHtml(d.tripStart||"-")}</div>
+        <div><strong>출장 종료:</strong> ${escHtml(d.tripEnd||"-")}</div>
+      </div>
+      <div class="row2" style="margin-top:8px">
+        <div><strong>출장지:</strong> ${escHtml(d.tripLocation||"-")}</div>
+        <div><strong>프로젝트:</strong> ${escHtml(d.project||"-")}</div>
+      </div>
+      <div style="margin-top:8px"><strong>출장 목적:</strong><br>${escHtml(d.tripPurpose||"").replace(/\n/g,"<br>")}</div>
+      <div style="margin-top:8px"><strong>출장자:</strong><br>${escHtml(d.travelers||"-").replace(/\n/g,"<br>")}</div>
+      <div style="margin-top:14px;padding:10px;background:var(--bg3);border-radius:6px">
+        <div style="font-weight:700;margin-bottom:6px">🚗 교통편</div>
+        <div class="row2">
+          <div><strong>교통편:</strong> ${escHtml(d.transport||"-")}</div>
+          <div><strong>결제 방법:</strong> ${escHtml(d.paymentType||"-")}</div>
+        </div>
+        <div class="row2" style="margin-top:6px">
+          <div><strong>출발:</strong> ${escHtml(d.departDt||"-").replace("T"," ")}</div>
+          <div><strong>복귀:</strong> ${escHtml(d.returnDt||"-").replace("T"," ")}</div>
+        </div>
+      </div>
+      <div style="margin-top:10px;padding:10px;background:var(--bg3);border-radius:6px">
+        <div style="font-weight:700;margin-bottom:6px">💰 출장 예산</div>
+        <div class="row2">
+          <div>숙박비: ${fmtMoney(d.costLodging||0)}원</div>
+          <div>일비: ${fmtMoney(d.costDaily||0)}원</div>
+        </div>
+        <div class="row2" style="margin-top:4px">
+          <div>교통비: ${fmtMoney(d.costTransport||0)}원</div>
+          <div>기타: ${fmtMoney(d.costEtc||0)}원</div>
+        </div>
+        <div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--border2);font-weight:800;color:var(--p)">
+          총 예상 비용: ${fmtMoney(d.costTotal||0)} 원
+        </div>
+      </div>
+      ${d.note ? `<div style="margin-top:8px"><strong>비고:</strong><br>${escHtml(d.note).replace(/\n/g,"<br>")}</div>` : ""}
+    `;
+  } else if (a.formId === "BIZ_TRIP_REPORT") {
+    return `
+      ${d.tripRefId ? `<div><strong>관련 출장신청:</strong> ${escHtml(d.tripRefId)}</div>` : ""}
+      <div class="row2" style="margin-top:8px">
+        <div><strong>출장 시작:</strong> ${escHtml(d.tripStart||"-")}</div>
+        <div><strong>출장 종료:</strong> ${escHtml(d.tripEnd||"-")}</div>
+      </div>
+      <div style="margin-top:8px"><strong>출장지/방문처:</strong> ${escHtml(d.tripLocation||"-")}</div>
+      <div style="margin-top:8px"><strong>방문 회사/담당자:</strong><br>${escHtml(d.contact||"-").replace(/\n/g,"<br>")}</div>
+      <div style="margin-top:8px"><strong>주요 활동 내역:</strong><br>${escHtml(d.activities||"").replace(/\n/g,"<br>")}</div>
+      <div style="margin-top:8px"><strong>성과/결과:</strong><br>${escHtml(d.results||"").replace(/\n/g,"<br>")}</div>
+      ${d.followup ? `<div style="margin-top:8px"><strong>후속 조치:</strong><br>${escHtml(d.followup).replace(/\n/g,"<br>")}</div>` : ""}
+      <div style="margin-top:14px;padding:10px;background:var(--bg3);border-radius:6px">
+        <div style="font-weight:700;margin-bottom:6px">💰 정산 내역</div>
+        <div class="row2">
+          <div>기 신청 예산: ${fmtMoney(d.budgetPlanned||0)} 원</div>
+          <div>실제 사용액: ${fmtMoney(d.budgetActual||0)} 원</div>
+        </div>
+        ${d.budgetNote ? `<div style="margin-top:6px;font-size:13px;color:var(--t2)">${escHtml(d.budgetNote)}</div>` : ""}
+      </div>
     `;
   }
   return `<pre style="font-size:13px;color:var(--t2)">${escHtml(JSON.stringify(d, null, 2))}</pre>`;
