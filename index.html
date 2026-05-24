@@ -861,6 +861,70 @@ function buildApprovalDescription(approval) {
     desc += `👥 대상 인원: ${d.employeeCount || 0}명\n`;
     desc += `💰 세전 총 지급액: ${fmtMoney(d.grossPay || 0)} 원\n`;
     desc += `💰 세후 지급액: ${fmtMoney(d.netPay || 0)} 원`;
+  } else if (formId === "RETIRE_PARTIAL") {
+    desc += `💰 정산희망일: ${d.settleDate || "-"}\n`;
+    desc += `📅 입사일: ${d.hireDate || "-"}\n`;
+    desc += `📝 신청 사유: ${d.reason || "-"}\n`;
+    desc += `🏦 수령방법: ${d.payMethod || "계좌이체"}`;
+  } else if (formId === "HIRING") {
+    desc += `📢 채용 사유: ${d.hireReason || "-"}\n`;
+    desc += `📋 채용 구분: ${d.hireType || "-"}\n`;
+    desc += `🏢 채용 부서: ${d.targetDept || "-"} / ${d.targetRank || "-"}\n`;
+    desc += `📅 근무 시작: ${d.startDate || "-"}\n`;
+    desc += `🎯 담당 업무: ${(d.targetJob || "").substring(0, 100)}`;
+  } else if (formId === "RESIGN") {
+    desc += `📤 사직 예정일: ${d.resignDate || "-"}\n`;
+    desc += `📅 입사일: ${d.hireDate || "-"}\n`;
+    desc += `📝 사직 사유: ${d.resignReason || "-"}\n`;
+    desc += `📋 인수인계: ${(d.handover || "").substring(0, 100)}`;
+  } else if (formId === "LEAVE_ABSENCE") {
+    desc += `🏥 휴직 기간: ${d.startDate} ~ ${d.endDate} (${d.duration || "-"})\n`;
+    desc += `📝 휴직 사유: ${d.leaveReason || "-"}\n`;
+    desc += `🏠 주소: ${d.address || "-"}\n`;
+    desc += `📞 연락처: ${d.contactPhone || "-"}`;
+  } else if (formId === "REASON_NOTE") {
+    desc += `📝 소명자: ${d.targetName || "-"} (${d.targetDept || ""} / ${d.targetRank || ""})\n`;
+    desc += `📅 발생일: ${d.incidentDate || "-"}\n`;
+    desc += `📌 사유: ${(d.reasonContent || "").substring(0, 200)}`;
+  } else if (formId === "BUSINESS_CARD") {
+    desc += `💳 신청자: ${d.cardKoName || "-"} (${d.cardEnName || "-"})\n`;
+    desc += `🏢 본부/팀: ${d.cardDept || "-"} / ${d.cardTeam || "-"}\n`;
+    desc += `📧 이메일: ${d.cardEmail || "-"}\n`;
+    desc += `📞 내선/휴대폰: ${d.cardOfficePhone || "-"} / ${d.cardMobile || "-"}`;
+  } else if (formId === "FUEL_REIMB") {
+    desc += `⛽ 정산 월: ${d.fuelMonth || "-"}\n`;
+    desc += `🚗 차량: ${d.fuelCarNumber || "-"} (${d.fuelCarType || "-"})\n`;
+    desc += `📊 연비: ${d.fuelEfficiency || "-"}km/L · 유가: ${d.fuelPrice || "-"}원\n`;
+    desc += `💰 정산 합계: ${fmtMoney(d.fuelTotal || 0)} 원`;
+  } else if (formId === "FUND_REPORT") {
+    desc += `📊 일자: ${d.reportDate || "-"}\n`;
+    desc += `💵 전일잔액: ${fmtMoney(d.prevBalance || 0)} 원\n`;
+    desc += `📥 입금: ${fmtMoney(d.incomeTotal || 0)} 원\n`;
+    desc += `📤 출금: ${fmtMoney(d.expenseTotal || 0)} 원\n`;
+    desc += `💰 당일잔액: ${fmtMoney(d.currentBalance || 0)} 원`;
+  } else if (formId === "CASH_LOG") {
+    desc += `💴 정산 월: ${d.cashMonth || "-"}\n`;
+    desc += `🏢 부서: ${d.cashDept || "-"}\n`;
+    desc += `📥 입금 합계: ${fmtMoney(d.cashIncomeTotal || 0)} 원\n`;
+    desc += `📤 출금 합계: ${fmtMoney(d.cashExpenseTotal || 0)} 원\n`;
+    desc += `💰 최종 잔액: ${fmtMoney(d.cashFinalBalance || 0)} 원`;
+  } else if (formId === "CARD_LIMIT") {
+    desc += `💳 카드번호: ${d.cardNumber || "-"}\n`;
+    desc += `👥 사용자: ${d.cardUsers || "-"}\n`;
+    desc += `💰 현재 한도: ${fmtMoney(d.currentLimit || 0)} 원\n`;
+    desc += `📈 증액 요청: ${fmtMoney(d.increaseAmount || 0)} 원\n`;
+    desc += `🎯 증액 목적: ${(d.increaseReason || "").substring(0, 150)}`;
+  } else if (formId === "RECOMMEND_PAYMENT") {
+    desc += `🎁 신청자: ${d.recommenderName || "-"} (${d.recommenderDept || ""})\n`;
+    desc += `👤 추천 입사자: ${d.candidateName || "-"} (${d.candidateDept || ""} / ${d.candidateRank || ""})\n`;
+    desc += `📅 입사일: ${d.candidateJoinDate || "-"}\n`;
+    desc += `💰 신청 금액: ${fmtMoney(d.recommendAmount || 0)} 원`;
+  } else if (formId === "CONGRATS_FUND") {
+    desc += `🌸 종류: ${d.congratsType || "-"}\n`;
+    desc += `👤 대상자: ${d.congratsTarget || "-"} (${d.congratsRelation || ""})\n`;
+    desc += `📅 사유 발생일: ${d.congratsDate || "-"}\n`;
+    desc += `📍 장소: ${d.congratsLocation || "-"}\n`;
+    desc += `💰 지급 금액: ${fmtMoney(d.congratsAmount || 0)} 원`;
   }
   
   // 결재라인 표시
@@ -1254,6 +1318,61 @@ function buildApprovalLine(formId, drafter, formData) {
     addUnique(findPersonByName(drafter["상위자"]));
     addUnique(findFinanceLead());
     addUnique(findCEO());
+  } else if (formId === "RETIRE_PARTIAL") {
+    // 퇴직금 중간정산: 상위자 → 부서장 → 재무 → CEO
+    addUnique(findPersonByName(drafter["상위자"]));
+    addUnique(findDeptHead(drafter["부서"]));
+    addUnique(findFinanceLead());
+    addUnique(findCEO());
+  } else if (formId === "HIRING") {
+    // 채용요청: 부서장 → 임원 → CEO (인사 합의)
+    addUnique(findPersonByName(drafter["상위자"]));
+    addUnique(findDeptHead(drafter["부서"]));
+    addUnique(findCEO());
+  } else if (formId === "RESIGN") {
+    // 사직서: 상위자 → 부서장 → 임원 → CEO
+    addUnique(findPersonByName(drafter["상위자"]));
+    addUnique(findDeptHead(drafter["부서"]));
+    addUnique(findCEO());
+  } else if (formId === "LEAVE_ABSENCE") {
+    // 휴직원: 상위자 → 부서장 → 임원 → CEO
+    addUnique(findPersonByName(drafter["상위자"]));
+    addUnique(findDeptHead(drafter["부서"]));
+    addUnique(findCEO());
+  } else if (formId === "REASON_NOTE") {
+    // 사유서/소명서: 상위자 → 부서장 → 임원 → CEO
+    addUnique(findPersonByName(drafter["상위자"]));
+    addUnique(findDeptHead(drafter["부서"]));
+    addUnique(findCEO());
+  } else if (formId === "BUSINESS_CARD") {
+    // 명함신청: 부서장 전결 (간소화)
+    addUnique(findPersonByName(drafter["상위자"]));
+    addUnique(findDeptHead(drafter["부서"]));
+  } else if (formId === "FUEL_REIMB") {
+    // 유류비 정산: 상위자 → 부서장 → 재무
+    addUnique(findPersonByName(drafter["상위자"]));
+    addUnique(findDeptHead(drafter["부서"]));
+    addUnique(findFinanceLead());
+  } else if (formId === "FUND_REPORT" || formId === "CASH_LOG") {
+    // 자금일보/현금출납장: 재무 → 임원 → CEO
+    addUnique(findPersonByName(drafter["상위자"]));
+    addUnique(findFinanceLead());
+    addUnique(findCEO());
+  } else if (formId === "CARD_LIMIT") {
+    // 법인카드 증액: 상위자 → 부서장 → 임원 → CEO (재무 합의)
+    addUnique(findPersonByName(drafter["상위자"]));
+    addUnique(findDeptHead(drafter["부서"]));
+    addUnique(findCEO());
+  } else if (formId === "RECOMMEND_PAYMENT") {
+    // 인재추천 수당: 상위자 → 부서장 → 인사 → CEO
+    addUnique(findPersonByName(drafter["상위자"]));
+    addUnique(findDeptHead(drafter["부서"]));
+    addUnique(findCEO());
+  } else if (formId === "CONGRATS_FUND") {
+    // 경조화금: 상위자 → 부서장 → CEO
+    addUnique(findPersonByName(drafter["상위자"]));
+    addUnique(findDeptHead(drafter["부서"]));
+    addUnique(findCEO());
   }
   
   return line.map((p, i) => ({
@@ -1314,37 +1433,40 @@ const FORM_TEMPLATES = [
   { id: "RESIGNATION_SETTLE", name: "퇴직 정산 품의", category: "인사", icon: "👋", phase: 1, desc: "퇴직금/4대보험 정산" },
   { id: "PAYROLL_REQUEST", name: "급여 지급 품의", category: "인사", icon: "💸", phase: 1, desc: "월별 임직원 급여 지급" },
   
+  // ━━ Phase 1.6 - 신규 활성 (인사/회계 양식) ━━
+  { id: "RETIRE_PARTIAL", name: "퇴직금 중간정산 신청서", category: "인사", icon: "💰", phase: 1, desc: "중간정산 신청 (주택구입/요양 등)" },
+  { id: "HIRING", name: "채용요청", category: "인사", icon: "📢", phase: 1, desc: "신규 채용 요청서" },
+  { id: "RESIGN", name: "사직서", category: "인사", icon: "📤", phase: 1, desc: "사직 의사 표명" },
+  { id: "LEAVE_ABSENCE", name: "휴직원", category: "인사", icon: "🏥", phase: 1, desc: "출산/육아/병가/개인 휴직" },
+  { id: "REASON_NOTE", name: "사유서/소명서", category: "인사", icon: "📝", phase: 1, desc: "사유 소명 (보안/근태 등)" },
+  { id: "BUSINESS_CARD", name: "명함신청", category: "일반", icon: "💳", phase: 1, desc: "명함 제작 요청 (한글/영문)" },
+  { id: "FUEL_REIMB", name: "차량 유류비 정산서", category: "출장", icon: "⛽", phase: 1, desc: "월별 유류비 정산" },
+  { id: "FUND_REPORT", name: "자금일보", category: "회계", icon: "📊", phase: 1, desc: "일자별 자금 입출금 현황" },
+  { id: "CASH_LOG", name: "현금출납장", category: "회계", icon: "💴", phase: 1, desc: "월별 현금 사용내역" },
+  { id: "CARD_LIMIT", name: "법인카드 증액 신청서", category: "회계", icon: "💳", phase: 1, desc: "한도 증액 (출장/행사 등)" },
+  { id: "RECOMMEND_PAYMENT", name: "인재추천수당 지급신청서", category: "인사", icon: "🎁", phase: 1, desc: "추천 입사자 수당 지급" },
+  { id: "CONGRATS_FUND", name: "경조화(금)신청", category: "인사", icon: "🌸", phase: 1, desc: "경조사 화환/경조금 신청" },
+  
   // ━━ Phase 2 - 추가 양식 (다우오피스 호환) ━━
   { id: "VACATION_PREGNANT", name: "임산부 근로시간 단축 신청서", category: "근태", phase: 2 },
   { id: "QUOTE_CUSTOMER", name: "견적서(고객사 제출)", category: "영업", phase: 2 },
-  { id: "RECOMMEND_PAYMENT", name: "인재추천수당 지급신청서", category: "인사", phase: 2 },
   { id: "RECOMMEND_PERSON", name: "인재추천서", category: "인사", phase: 2 },
   { id: "CCTV_VIEW", name: "CCTV 조회 신청서", category: "일반", phase: 2 },
-  { id: "CONGRATS_FUND", name: "경조화(금)신청", category: "인사", phase: 2 },
-  { id: "BUSINESS_CARD", name: "명함신청", category: "일반", phase: 2 },
-  { id: "RETIRE_PARTIAL", name: "퇴직금 중간정산 신청서", category: "인사", phase: 2 },
-  { id: "REASON_NOTE", name: "사유서", category: "인사", phase: 2 },
-  { id: "RESIGN", name: "사직서", category: "인사", phase: 2 },
   { id: "EDUCATION", name: "교육수강신청", category: "인사", phase: 2 },
   { id: "EDUCATION_REPORT", name: "전파교육 보고", category: "인사", phase: 2 },
   { id: "PROMOTE_SPECIAL", name: "특별승진 추천서", category: "인사", phase: 2 },
-  { id: "HIRING", name: "채용요청", category: "인사", phase: 2 },
   { id: "RETURN_WORK", name: "복직원", category: "인사", phase: 2 },
   { id: "FLEX_HOUR", name: "시차출퇴근 신청서", category: "인사", phase: 2 },
-  { id: "LEAVE_ABSENCE", name: "휴직원", category: "인사", phase: 2 },
-  { id: "CASH_LOG", name: "현금출납장", category: "회계", phase: 2 },
   { id: "NEW_VENDOR", name: "신규거래처등록신청", category: "회계", phase: 2 },
-  { id: "FUND_REPORT", name: "자금일보", category: "회계", phase: 2 },
-  { id: "FUEL_REIMB", name: "차량 유류비 정산서", category: "출장", phase: 2 },
   { id: "SAFETY_WORK", name: "안전 작업 허가 신청서", category: "일반", phase: 2 },
-  { id: "CARD_LIMIT", name: "법인카드 증액 신청서", category: "회계", phase: 2 },
   { id: "INCIDENT_REPORT", name: "사고보고서", category: "일반", phase: 2 },
   { id: "RESULT_REPORT", name: "결과 보고서", category: "일반", phase: 2 },
   { id: "WORK_ORDER", name: "제작/공정 의뢰서", category: "일반", phase: 2 },
   { id: "MEETING_BUDGET", name: "회의비 사용 계획서", category: "일반", phase: 2 },
   { id: "SEAL_RELEASE", name: "사용인감 반출신청서", category: "일반", phase: 2 },
   { id: "CARD_REDISTRIBUTE", name: "법인카드 재배부", category: "회계", phase: 2 },
-  { id: "EN_DRAFT", name: "EN_품의서 (이엔머티리얼즈)", category: "일반", phase: 2 }
+  { id: "EN_DRAFT", name: "EN_품의서 (이엔머티리얼즈)", category: "일반", phase: 2 },
+  { id: "RESIGN_PROCESS", name: "퇴사 프로세스", category: "인사", phase: 2 }
 ];
 
 // ━━ 페이지 네비 ━━
@@ -2497,7 +2619,715 @@ function renderComposeForm() {
         💡 지급일은 통상 매월 25일
       </div>
     `;
+  } else if (f.formId === "RETIRE_PARTIAL") {
+    // 퇴직금 중간정산 신청서
+    formHtml = `
+      <div class="row2">
+        <div class="fg">
+          <label class="fl">정산 희망일자<span class="req">*</span></label>
+          <input type="date" class="si" id="f_settleDate" value="${f.formData.settleDate||''}" onchange="composeState.formData.settleDate=this.value">
+        </div>
+        <div class="fg">
+          <label class="fl">입사일자</label>
+          <input type="date" class="si" id="f_hireDate" value="${f.formData.hireDate||''}" onchange="composeState.formData.hireDate=this.value">
+        </div>
+      </div>
+      <div class="fg">
+        <label class="fl">중간정산 신청 사유<span class="req">*</span></label>
+        <select class="ss" id="f_reason" onchange="composeState.formData.reason=this.value">
+          <option value="">선택</option>
+          <option value="무주택자의 주택구입" ${f.formData.reason==="무주택자의 주택구입"?"selected":""}>무주택자의 주택구입</option>
+          <option value="무주택자의 전세금 부담" ${f.formData.reason==="무주택자의 전세금 부담"?"selected":""}>무주택자의 전세금 부담</option>
+          <option value="본인/배우자 포함 6개월 이상 요양" ${f.formData.reason==="본인/배우자 포함 6개월 이상 요양"?"selected":""}>본인/배우자 포함 6개월 이상 요양</option>
+          <option value="최근 5년 이내 파산선고" ${f.formData.reason==="최근 5년 이내 파산선고"?"selected":""}>최근 5년 이내 파산선고</option>
+          <option value="최근 5년 이내 회생절차 개시결정" ${f.formData.reason==="최근 5년 이내 회생절차 개시결정"?"selected":""}>최근 5년 이내 회생절차 개시결정</option>
+          <option value="임금피크제 실시" ${f.formData.reason==="임금피크제 실시"?"selected":""}>임금피크제 실시</option>
+          <option value="천재지변 등으로 인한 피해" ${f.formData.reason==="천재지변 등으로 인한 피해"?"selected":""}>천재지변 등으로 인한 피해</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label class="fl">사유 상세 설명<span class="req">*</span></label>
+        <textarea class="ta" id="f_reasonDetail" placeholder="구체적인 사유 (증빙 가능한 내용)" onchange="composeState.formData.reasonDetail=this.value">${escHtml(f.formData.reasonDetail||'')}</textarea>
+      </div>
+      <div class="form-paper" style="background:var(--bg3)">
+        <h3>🏦 수령 정보</h3>
+        <div class="row2">
+          <div class="fg">
+            <label class="fl">수령 방법</label>
+            <select class="ss" id="f_payMethod" onchange="composeState.formData.payMethod=this.value">
+              <option value="본인명의 계좌이체" ${f.formData.payMethod==="본인명의 계좌이체"?"selected":""}>본인명의 계좌이체</option>
+            </select>
+          </div>
+          <div class="fg">
+            <label class="fl">은행명</label>
+            <input type="text" class="si" id="f_bankName" placeholder="예: 기업은행" value="${escHtml(f.formData.bankName||'')}" onchange="composeState.formData.bankName=this.value">
+          </div>
+        </div>
+        <div class="row2">
+          <div class="fg">
+            <label class="fl">예금주</label>
+            <input type="text" class="si" id="f_accountHolder" value="${escHtml(f.formData.accountHolder||'')}" onchange="composeState.formData.accountHolder=this.value">
+          </div>
+          <div class="fg">
+            <label class="fl">계좌번호</label>
+            <input type="text" class="si" id="f_accountNumber" value="${escHtml(f.formData.accountNumber||'')}" onchange="composeState.formData.accountNumber=this.value">
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:8px;padding:10px;background:#fef3c7;border-left:3px solid #f59e0b;border-radius:6px;font-size:11px;color:#92400e">
+        💡 서약 사항: 1) 회사 규정 준수, 2) 중간정산 후 계속근로연수 재시작, 3) 본인 책임 인지<br>
+        💡 첨부 필수: 사유 증빙 서류 (계약서, 진단서 등)
+      </div>
+    `;
+  } else if (f.formId === "HIRING") {
+    // 채용 요청
+    formHtml = `
+      <div class="row2">
+        <div class="fg">
+          <label class="fl">채용 사유<span class="req">*</span></label>
+          <select class="ss" id="f_hireReason" onchange="composeState.formData.hireReason=this.value">
+            <option value="">선택</option>
+            <option value="신규충원" ${f.formData.hireReason==="신규충원"?"selected":""}>신규충원</option>
+            <option value="조직개편" ${f.formData.hireReason==="조직개편"?"selected":""}>조직개편</option>
+            <option value="신규사업" ${f.formData.hireReason==="신규사업"?"selected":""}>신규사업</option>
+            <option value="단기작업" ${f.formData.hireReason==="단기작업"?"selected":""}>단기작업</option>
+            <option value="결원발생" ${f.formData.hireReason==="결원발생"?"selected":""}>결원발생</option>
+            <option value="기타" ${f.formData.hireReason==="기타"?"selected":""}>기타</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label class="fl">채용 구분<span class="req">*</span></label>
+          <select class="ss" id="f_hireType" onchange="composeState.formData.hireType=this.value">
+            <option value="">선택</option>
+            <option value="정규직" ${f.formData.hireType==="정규직"?"selected":""}>정규직</option>
+            <option value="계약직" ${f.formData.hireType==="계약직"?"selected":""}>계약직</option>
+            <option value="아르바이트" ${f.formData.hireType==="아르바이트"?"selected":""}>아르바이트</option>
+          </select>
+        </div>
+      </div>
+      <div class="row2">
+        <div class="fg">
+          <label class="fl">근무 시작일<span class="req">*</span></label>
+          <input type="date" class="si" id="f_startDate" value="${f.formData.startDate||''}" onchange="composeState.formData.startDate=this.value">
+        </div>
+        <div class="fg">
+          <label class="fl">채용 부서<span class="req">*</span></label>
+          <input type="text" class="si" id="f_targetDept" placeholder="예: 기술연구소" value="${escHtml(f.formData.targetDept||'')}" onchange="composeState.formData.targetDept=this.value">
+        </div>
+      </div>
+      <div class="form-paper" style="background:var(--bg3)">
+        <h3>👤 인력 요건</h3>
+        <div class="row2">
+          <div class="fg">
+            <label class="fl">경력</label>
+            <select class="ss" id="f_career" onchange="composeState.formData.career=this.value">
+              <option value="">선택</option>
+              <option value="신입" ${f.formData.career==="신입"?"selected":""}>신입</option>
+              <option value="경력" ${f.formData.career==="경력"?"selected":""}>경력</option>
+              <option value="무관" ${f.formData.career==="무관"?"selected":""}>무관</option>
+            </select>
+          </div>
+          <div class="fg">
+            <label class="fl">학력</label>
+            <select class="ss" id="f_education" onchange="composeState.formData.education=this.value">
+              <option value="">선택</option>
+              <option value="박사급" ${f.formData.education==="박사급"?"selected":""}>박사급</option>
+              <option value="석사급" ${f.formData.education==="석사급"?"selected":""}>석사급</option>
+              <option value="4년대졸" ${f.formData.education==="4년대졸"?"selected":""}>4년대졸</option>
+              <option value="전문대졸" ${f.formData.education==="전문대졸"?"selected":""}>전문대졸</option>
+              <option value="무관" ${f.formData.education==="무관"?"selected":""}>무관</option>
+            </select>
+          </div>
+        </div>
+        <div class="row2">
+          <div class="fg">
+            <label class="fl">성별</label>
+            <select class="ss" id="f_gender" onchange="composeState.formData.gender=this.value">
+              <option value="무관" ${f.formData.gender==="무관"?"selected":""}>무관</option>
+              <option value="남" ${f.formData.gender==="남"?"selected":""}>남</option>
+              <option value="여" ${f.formData.gender==="여"?"selected":""}>여</option>
+            </select>
+          </div>
+          <div class="fg">
+            <label class="fl">희망 직급</label>
+            <input type="text" class="si" id="f_targetRank" placeholder="예: 차장급 이상" value="${escHtml(f.formData.targetRank||'')}" onchange="composeState.formData.targetRank=this.value">
+          </div>
+        </div>
+      </div>
+      <div class="fg">
+        <label class="fl">담당 업무<span class="req">*</span></label>
+        <input type="text" class="si" id="f_targetJob" placeholder="예: 헤드개발" value="${escHtml(f.formData.targetJob||'')}" onchange="composeState.formData.targetJob=this.value">
+      </div>
+      <div class="fg">
+        <label class="fl">자격 요건 및 우대사항<span class="req">*</span></label>
+        <textarea class="ta" id="f_requirements" placeholder="전공:&#10;필요 경력:&#10;자격 사항:&#10;우대 사항:" onchange="composeState.formData.requirements=this.value" style="min-height:150px">${escHtml(f.formData.requirements||'')}</textarea>
+      </div>
+    `;
+  } else if (f.formId === "RESIGN") {
+    // 사직서
+    formHtml = `
+      <div class="row2">
+        <div class="fg">
+          <label class="fl">사직 예정일<span class="req">*</span></label>
+          <input type="date" class="si" id="f_resignDate" value="${f.formData.resignDate||''}" onchange="composeState.formData.resignDate=this.value">
+        </div>
+        <div class="fg">
+          <label class="fl">입사일</label>
+          <input type="date" class="si" id="f_hireDate" value="${f.formData.hireDate||''}" onchange="composeState.formData.hireDate=this.value">
+        </div>
+      </div>
+      <div class="fg">
+        <label class="fl">사직 사유<span class="req">*</span></label>
+        <select class="ss" id="f_resignReason" onchange="composeState.formData.resignReason=this.value">
+          <option value="">선택</option>
+          <option value="개인사정" ${f.formData.resignReason==="개인사정"?"selected":""}>개인사정</option>
+          <option value="이직" ${f.formData.resignReason==="이직"?"selected":""}>이직</option>
+          <option value="진학" ${f.formData.resignReason==="진학"?"selected":""}>진학</option>
+          <option value="건강상의 이유" ${f.formData.resignReason==="건강상의 이유"?"selected":""}>건강상의 이유</option>
+          <option value="가정 사정" ${f.formData.resignReason==="가정 사정"?"selected":""}>가정 사정</option>
+          <option value="기타" ${f.formData.resignReason==="기타"?"selected":""}>기타</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label class="fl">사직 사유 상세</label>
+        <textarea class="ta" id="f_resignDetail" placeholder="구체적 사유" onchange="composeState.formData.resignDetail=this.value">${escHtml(f.formData.resignDetail||'')}</textarea>
+      </div>
+      <div class="fg">
+        <label class="fl">인수인계 계획<span class="req">*</span></label>
+        <textarea class="ta" id="f_handover" placeholder="업무 인수인계 계획 (담당자/일정/주요 업무)" onchange="composeState.formData.handover=this.value" style="min-height:100px">${escHtml(f.formData.handover||'')}</textarea>
+      </div>
+      <div style="margin-top:8px;padding:10px;background:#fee2e2;border-left:3px solid #dc2626;border-radius:6px;font-size:11px;color:#991b1b">
+        💡 사직서 제출 후 인사팀에서 퇴사 프로세스 안내드립니다.<br>
+        💡 통상 30일 전 제출 권장 (근로기준법 기준)
+      </div>
+    `;
+  } else if (f.formId === "LEAVE_ABSENCE") {
+    // 휴직원
+    formHtml = `
+      <div class="row2">
+        <div class="fg">
+          <label class="fl">휴직 시작일<span class="req">*</span></label>
+          <input type="date" class="si" id="f_startDate" value="${f.formData.startDate||''}" onchange="composeState.formData.startDate=this.value;calcLeaveDuration()">
+        </div>
+        <div class="fg">
+          <label class="fl">휴직 종료일<span class="req">*</span></label>
+          <input type="date" class="si" id="f_endDate" value="${f.formData.endDate||''}" onchange="composeState.formData.endDate=this.value;calcLeaveDuration()">
+        </div>
+      </div>
+      <div class="fg">
+        <label class="fl">휴직 기간</label>
+        <input type="text" class="si" id="f_duration" placeholder="자동 계산" value="${escHtml(f.formData.duration||'')}" onchange="composeState.formData.duration=this.value" readonly>
+      </div>
+      <div class="fg">
+        <label class="fl">휴직 사유<span class="req">*</span></label>
+        <select class="ss" id="f_leaveReason" onchange="composeState.formData.leaveReason=this.value">
+          <option value="">선택</option>
+          <option value="출산휴가" ${f.formData.leaveReason==="출산휴가"?"selected":""}>출산휴가 (90/120일)</option>
+          <option value="육아휴직" ${f.formData.leaveReason==="육아휴직"?"selected":""}>육아휴직 (최대 1년)</option>
+          <option value="병가/요양" ${f.formData.leaveReason==="병가/요양"?"selected":""}>병가/요양</option>
+          <option value="가족 돌봄" ${f.formData.leaveReason==="가족 돌봄"?"selected":""}>가족 돌봄</option>
+          <option value="개인 휴직" ${f.formData.leaveReason==="개인 휴직"?"selected":""}>개인 휴직</option>
+          <option value="기타" ${f.formData.leaveReason==="기타"?"selected":""}>기타</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label class="fl">사유 상세</label>
+        <textarea class="ta" id="f_leaveDetail" placeholder="구체적 사유 (예: 출산휴가 120일, 출생증명서 추후 첨부)" onchange="composeState.formData.leaveDetail=this.value">${escHtml(f.formData.leaveDetail||'')}</textarea>
+      </div>
+      <div class="row2">
+        <div class="fg">
+          <label class="fl">주소</label>
+          <input type="text" class="si" id="f_address" placeholder="휴직 중 거주지" value="${escHtml(f.formData.address||'')}" onchange="composeState.formData.address=this.value">
+        </div>
+        <div class="fg">
+          <label class="fl">휴대폰</label>
+          <input type="text" class="si" id="f_contactPhone" placeholder="010-xxxx-xxxx" value="${escHtml(f.formData.contactPhone||'')}" onchange="composeState.formData.contactPhone=this.value">
+        </div>
+      </div>
+      <div style="margin-top:8px;padding:10px;background:var(--pd);border-left:3px solid var(--p);border-radius:6px;font-size:11px;color:var(--p)">
+        💡 첨부: 휴직 사유 증빙 서류 (출생증명서/진단서 등)
+      </div>
+    `;
+  } else if (f.formId === "REASON_NOTE") {
+    // 사유서/소명서
+    formHtml = `
+      <div class="form-paper" style="background:var(--bg3)">
+        <h3>👤 인적사항</h3>
+        <div class="row2">
+          <div class="fg">
+            <label class="fl">소명자 성명<span class="req">*</span></label>
+            <input type="text" class="si" id="f_targetName" value="${escHtml(f.formData.targetName||'')}" onchange="composeState.formData.targetName=this.value">
+          </div>
+          <div class="fg">
+            <label class="fl">부서/팀</label>
+            <input type="text" class="si" id="f_targetDept" value="${escHtml(f.formData.targetDept||'')}" onchange="composeState.formData.targetDept=this.value">
+          </div>
+        </div>
+        <div class="row2">
+          <div class="fg">
+            <label class="fl">직급</label>
+            <input type="text" class="si" id="f_targetRank" value="${escHtml(f.formData.targetRank||'')}" onchange="composeState.formData.targetRank=this.value">
+          </div>
+          <div class="fg">
+            <label class="fl">연락처</label>
+            <input type="text" class="si" id="f_targetPhone" value="${escHtml(f.formData.targetPhone||'')}" onchange="composeState.formData.targetPhone=this.value">
+          </div>
+        </div>
+      </div>
+      <div class="fg">
+        <label class="fl">발생일<span class="req">*</span></label>
+        <input type="date" class="si" id="f_incidentDate" value="${f.formData.incidentDate||''}" onchange="composeState.formData.incidentDate=this.value">
+      </div>
+      <div class="fg">
+        <label class="fl">소명 내용 / 사유<span class="req">*</span></label>
+        <textarea class="ta" id="f_reasonContent" placeholder="1. 내용&#10;본인은 ~~ 관련 ~~을 하였습니다.&#10;~~ 목적에 한해 사용/처리하였습니다.&#10;본 문서에 명시된 목적 외 사용 시 책임을 질 것임을 확인합니다.&#10;&#10;2. 첨부파일&#10;관련 자료 스캔파일" onchange="composeState.formData.reasonContent=this.value" style="min-height:200px">${escHtml(f.formData.reasonContent||'')}</textarea>
+      </div>
+    `;
+  } else if (f.formId === "BUSINESS_CARD") {
+    // 명함신청
+    formHtml = `
+      <div class="form-paper">
+        <h3>💳 명함 정보</h3>
+        <div class="row2">
+          <div class="fg">
+            <label class="fl">이름 (한글)<span class="req">*</span></label>
+            <input type="text" class="si" id="f_cardKoName" placeholder="예: 성백훈" value="${escHtml(f.formData.cardKoName||'')}" onchange="composeState.formData.cardKoName=this.value">
+          </div>
+          <div class="fg">
+            <label class="fl">이름 (영문)</label>
+            <input type="text" class="si" id="f_cardEnName" placeholder="예: BAEK-HUN SEONG" value="${escHtml(f.formData.cardEnName||'')}" onchange="composeState.formData.cardEnName=this.value">
+          </div>
+        </div>
+        <div class="row2">
+          <div class="fg">
+            <label class="fl">본부/센터 (한글)<span class="req">*</span></label>
+            <input type="text" class="si" id="f_cardDept" placeholder="예: 경영전략본부" value="${escHtml(f.formData.cardDept||'')}" onchange="composeState.formData.cardDept=this.value">
+          </div>
+          <div class="fg">
+            <label class="fl">본부 (영문)</label>
+            <input type="text" class="si" id="f_cardEnDept" placeholder="예: Business Strategy Division" value="${escHtml(f.formData.cardEnDept||'')}" onchange="composeState.formData.cardEnDept=this.value">
+          </div>
+        </div>
+        <div class="row2">
+          <div class="fg">
+            <label class="fl">팀 (한글)</label>
+            <input type="text" class="si" id="f_cardTeam" placeholder="예: 경영기획팀" value="${escHtml(f.formData.cardTeam||'')}" onchange="composeState.formData.cardTeam=this.value">
+          </div>
+          <div class="fg">
+            <label class="fl">직급 (한글)<span class="req">*</span></label>
+            <input type="text" class="si" id="f_cardRank" placeholder="예: 본부장/전무이사/Ph.D." value="${escHtml(f.formData.cardRank||'')}" onchange="composeState.formData.cardRank=this.value">
+          </div>
+        </div>
+        <div class="fg">
+          <label class="fl">직급 (영문)</label>
+          <input type="text" class="si" id="f_cardEnRank" placeholder="예: Executive Vice President / EVP / Ph.D." value="${escHtml(f.formData.cardEnRank||'')}" onchange="composeState.formData.cardEnRank=this.value">
+        </div>
+      </div>
+      <div class="form-paper" style="background:var(--bg3)">
+        <h3>📞 연락처</h3>
+        <div class="row2">
+          <div class="fg">
+            <label class="fl">이메일</label>
+            <input type="email" class="si" id="f_cardEmail" placeholder="예: name@enjet.co.kr" value="${escHtml(f.formData.cardEmail||'')}" onchange="composeState.formData.cardEmail=this.value">
+          </div>
+          <div class="fg">
+            <label class="fl">내선번호</label>
+            <input type="text" class="si" id="f_cardOfficePhone" placeholder="070-xxxx-xxxx" value="${escHtml(f.formData.cardOfficePhone||'')}" onchange="composeState.formData.cardOfficePhone=this.value">
+          </div>
+        </div>
+        <div class="row2">
+          <div class="fg">
+            <label class="fl">휴대폰</label>
+            <input type="text" class="si" id="f_cardMobile" placeholder="010-xxxx-xxxx" value="${escHtml(f.formData.cardMobile||'')}" onchange="composeState.formData.cardMobile=this.value">
+          </div>
+          <div class="fg">
+            <label class="fl">수량</label>
+            <input type="number" class="si" id="f_cardQty" placeholder="100" value="${f.formData.cardQty||'100'}" onchange="composeState.formData.cardQty=this.value">
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:8px;padding:10px;background:var(--pd);border-left:3px solid var(--p);border-radius:6px;font-size:11px;color:var(--p)">
+        💡 명함신청은 본부장 전결<br>
+        💡 통상 100매 제작 · 1주일 소요
+      </div>
+    `;
+  } else if (f.formId === "FUEL_REIMB") {
+    // 차량 유류비 정산서
+    formHtml = `
+      <div class="row2">
+        <div class="fg">
+          <label class="fl">정산 월<span class="req">*</span></label>
+          <input type="month" class="si" id="f_fuelMonth" value="${f.formData.fuelMonth||''}" onchange="composeState.formData.fuelMonth=this.value">
+        </div>
+        <div class="fg">
+          <label class="fl">차량 번호<span class="req">*</span></label>
+          <input type="text" class="si" id="f_fuelCarNumber" placeholder="예: 52우 9563" value="${escHtml(f.formData.fuelCarNumber||'')}" onchange="composeState.formData.fuelCarNumber=this.value">
+        </div>
+      </div>
+      <div class="row2">
+        <div class="fg">
+          <label class="fl">차종</label>
+          <input type="text" class="si" id="f_fuelCarType" placeholder="예: 투싼" value="${escHtml(f.formData.fuelCarType||'')}" onchange="composeState.formData.fuelCarType=this.value">
+        </div>
+        <div class="fg">
+          <label class="fl">연료</label>
+          <select class="ss" id="f_fuelType" onchange="composeState.formData.fuelType=this.value">
+            <option value="휘발유" ${f.formData.fuelType==="휘발유"?"selected":""}>휘발유</option>
+            <option value="경유" ${f.formData.fuelType==="경유"?"selected":""}>경유</option>
+            <option value="LPG" ${f.formData.fuelType==="LPG"?"selected":""}>LPG</option>
+          </select>
+        </div>
+      </div>
+      <div class="row2">
+        <div class="fg">
+          <label class="fl">연비 (km/L)</label>
+          <input type="number" class="si" id="f_fuelEfficiency" placeholder="10" value="${f.formData.fuelEfficiency||''}" onchange="composeState.formData.fuelEfficiency=this.value">
+        </div>
+        <div class="fg">
+          <label class="fl">유가 기준 (원/L)</label>
+          <input type="number" step="0.01" class="si" id="f_fuelPrice" placeholder="1979.31" value="${f.formData.fuelPrice||''}" onchange="composeState.formData.fuelPrice=this.value">
+        </div>
+      </div>
+      <div class="fg">
+        <label class="fl">운행 내역<span class="req">*</span></label>
+        <textarea class="ta" id="f_fuelTrips" placeholder="1. 2026-04-09(목) 엔젯→대전컨벤션 / 학회 / 129km / 25,500원&#10;2. 2026-04-09(목) 대전컨벤션→엔젯 / 학회 / 129km / 25,500원&#10;..." onchange="composeState.formData.fuelTrips=this.value" style="min-height:200px;font-family:monospace;font-size:11px">${escHtml(f.formData.fuelTrips||'')}</textarea>
+      </div>
+      <div class="fg">
+        <label class="fl">총 정산 금액 (원)<span class="req">*</span></label>
+        <input type="number" class="si" id="f_fuelTotal" placeholder="0" value="${f.formData.fuelTotal||''}" onchange="composeState.formData.fuelTotal=this.value">
+      </div>
+      <div style="margin-top:8px;padding:10px;background:#fef3c7;border-left:3px solid #f59e0b;border-radius:6px;font-size:11px;color:#92400e">
+        💡 유가 기준: www.opinet.co.kr (매월 말일 기준)<br>
+        💡 첨부 필수: 통행료/주차료 영수증
+      </div>
+    `;
+  } else if (f.formId === "FUND_REPORT") {
+    // 자금일보
+    formHtml = `
+      <div class="fg">
+        <label class="fl">일자<span class="req">*</span></label>
+        <input type="date" class="si" id="f_reportDate" value="${f.formData.reportDate||''}" onchange="composeState.formData.reportDate=this.value">
+      </div>
+      <div class="form-paper" style="background:var(--bg3)">
+        <h3>💵 잔액 현황</h3>
+        <div class="row2">
+          <div class="fg">
+            <label class="fl">전일 잔액 (원)</label>
+            <input type="number" class="si" id="f_prevBalance" placeholder="0" value="${f.formData.prevBalance||''}" onchange="composeState.formData.prevBalance=this.value;calcFundBalance()">
+          </div>
+          <div class="fg">
+            <label class="fl">당일 잔액 (원)<span class="req">*</span></label>
+            <input type="number" class="si" id="f_currentBalance" placeholder="자동 계산" value="${f.formData.currentBalance||''}" onchange="composeState.formData.currentBalance=this.value">
+          </div>
+        </div>
+      </div>
+      <div class="row2">
+        <div class="fg">
+          <label class="fl">총 입금 (원)</label>
+          <input type="number" class="si" id="f_incomeTotal" placeholder="0" value="${f.formData.incomeTotal||''}" onchange="composeState.formData.incomeTotal=this.value;calcFundBalance()">
+        </div>
+        <div class="fg">
+          <label class="fl">총 출금 (원)</label>
+          <input type="number" class="si" id="f_expenseTotal" placeholder="0" value="${f.formData.expenseTotal||''}" onchange="composeState.formData.expenseTotal=this.value;calcFundBalance()">
+        </div>
+      </div>
+      <div class="fg">
+        <label class="fl">입금 내역</label>
+        <textarea class="ta" id="f_incomeDetails" placeholder="1. 매출 입금 / 100,000,000 / ABC전자&#10;2. 기타 / 5,000,000 / ..." onchange="composeState.formData.incomeDetails=this.value" style="font-family:monospace;font-size:11px">${escHtml(f.formData.incomeDetails||'')}</textarea>
+      </div>
+      <div class="fg">
+        <label class="fl">출금 내역</label>
+        <textarea class="ta" id="f_expenseDetails" placeholder="1. 인건비 / 50,000,000 / 5월 급여&#10;2. 사무용품 / 200,000 / ..." onchange="composeState.formData.expenseDetails=this.value" style="font-family:monospace;font-size:11px">${escHtml(f.formData.expenseDetails||'')}</textarea>
+      </div>
+    `;
+  } else if (f.formId === "CASH_LOG") {
+    // 현금출납장
+    formHtml = `
+      <div class="row2">
+        <div class="fg">
+          <label class="fl">정산 월<span class="req">*</span></label>
+          <input type="month" class="si" id="f_cashMonth" value="${f.formData.cashMonth||''}" onchange="composeState.formData.cashMonth=this.value">
+        </div>
+        <div class="fg">
+          <label class="fl">부서<span class="req">*</span></label>
+          <input type="text" class="si" id="f_cashDept" placeholder="예: 경영기획실" value="${escHtml(f.formData.cashDept||'')}" onchange="composeState.formData.cashDept=this.value">
+        </div>
+      </div>
+      <div class="form-paper" style="background:var(--bg3)">
+        <h3>💴 출납 집계</h3>
+        <div class="row2">
+          <div class="fg">
+            <label class="fl">전월 이월</label>
+            <input type="number" class="si" id="f_cashPrevBalance" placeholder="0" value="${f.formData.cashPrevBalance||''}" onchange="composeState.formData.cashPrevBalance=this.value;calcCashBalance()">
+          </div>
+          <div class="fg">
+            <label class="fl">최종 잔액 (원)</label>
+            <input type="number" class="si" id="f_cashFinalBalance" placeholder="자동 계산" value="${f.formData.cashFinalBalance||''}" onchange="composeState.formData.cashFinalBalance=this.value">
+          </div>
+        </div>
+        <div class="row2">
+          <div class="fg">
+            <label class="fl">입금 합계 (원)</label>
+            <input type="number" class="si" id="f_cashIncomeTotal" placeholder="0" value="${f.formData.cashIncomeTotal||''}" onchange="composeState.formData.cashIncomeTotal=this.value;calcCashBalance()">
+          </div>
+          <div class="fg">
+            <label class="fl">출금 합계 (원)</label>
+            <input type="number" class="si" id="f_cashExpenseTotal" placeholder="0" value="${f.formData.cashExpenseTotal||''}" onchange="composeState.formData.cashExpenseTotal=this.value;calcCashBalance()">
+          </div>
+        </div>
+      </div>
+      <div class="fg">
+        <label class="fl">사용 내역<span class="req">*</span></label>
+        <textarea class="ta" id="f_cashItems" placeholder="No / 날짜 / 적요 / 입금 / 출금 / 잔액 / 비고&#10;1. 2026-03-06 택배선불(엠엠티) /  / 6,000 / 88,200 /&#10;..." onchange="composeState.formData.cashItems=this.value" style="min-height:200px;font-family:monospace;font-size:11px">${escHtml(f.formData.cashItems||'')}</textarea>
+      </div>
+    `;
+  } else if (f.formId === "CARD_LIMIT") {
+    // 법인카드 증액 신청서
+    formHtml = `
+      <div class="row2">
+        <div class="fg">
+          <label class="fl">카드 번호<span class="req">*</span></label>
+          <input type="text" class="si" id="f_cardNumber" placeholder="4140-0307-6421-1959" value="${escHtml(f.formData.cardNumber||'')}" onchange="composeState.formData.cardNumber=this.value">
+        </div>
+        <div class="fg">
+          <label class="fl">사용자<span class="req">*</span></label>
+          <input type="text" class="si" id="f_cardUsers" placeholder="예: 강승원, 차재성" value="${escHtml(f.formData.cardUsers||'')}" onchange="composeState.formData.cardUsers=this.value">
+        </div>
+      </div>
+      <div class="row2">
+        <div class="fg">
+          <label class="fl">사용일자</label>
+          <input type="date" class="si" id="f_useDate" value="${f.formData.useDate||''}" onchange="composeState.formData.useDate=this.value">
+        </div>
+        <div class="fg">
+          <label class="fl">현재 한도 (원)</label>
+          <input type="number" class="si" id="f_currentLimit" placeholder="500000" value="${f.formData.currentLimit||''}" onchange="composeState.formData.currentLimit=this.value">
+        </div>
+      </div>
+      <div class="row2">
+        <div class="fg">
+          <label class="fl">잔여 한도 (원)</label>
+          <input type="number" class="si" id="f_remainingLimit" placeholder="0" value="${f.formData.remainingLimit||''}" onchange="composeState.formData.remainingLimit=this.value">
+        </div>
+        <div class="fg">
+          <label class="fl">사용 예정 금액 (원)<span class="req">*</span></label>
+          <input type="number" class="si" id="f_useAmount" placeholder="0" value="${f.formData.useAmount||''}" onchange="composeState.formData.useAmount=this.value">
+        </div>
+      </div>
+      <div class="fg">
+        <label class="fl">증액 요청 금액 (원)<span class="req">*</span></label>
+        <input type="number" class="si" id="f_increaseAmount" placeholder="0" value="${f.formData.increaseAmount||''}" onchange="composeState.formData.increaseAmount=this.value">
+      </div>
+      <div class="fg">
+        <label class="fl">증액 목적<span class="req">*</span></label>
+        <textarea class="ta" id="f_increaseReason" placeholder="예: 2026 대한금속재료학회 부스 운영을 위한 출장(제주ICC)" onchange="composeState.formData.increaseReason=this.value">${escHtml(f.formData.increaseReason||'')}</textarea>
+      </div>
+      <div class="fg">
+        <label class="fl">비고</label>
+        <textarea class="ta" id="f_note" placeholder="추가 설명" onchange="composeState.formData.note=this.value">${escHtml(f.formData.note||'')}</textarea>
+      </div>
+    `;
+  } else if (f.formId === "RECOMMEND_PAYMENT") {
+    // 인재추천 수당 지급 신청서
+    formHtml = `
+      <div class="form-paper">
+        <h3>👤 신청인 (추천한 사람)</h3>
+        <div class="row2">
+          <div class="fg">
+            <label class="fl">성명<span class="req">*</span></label>
+            <input type="text" class="si" id="f_recommenderName" value="${escHtml(f.formData.recommenderName||'')}" onchange="composeState.formData.recommenderName=this.value">
+          </div>
+          <div class="fg">
+            <label class="fl">부서/팀</label>
+            <input type="text" class="si" id="f_recommenderDept" value="${escHtml(f.formData.recommenderDept||'')}" onchange="composeState.formData.recommenderDept=this.value">
+          </div>
+        </div>
+        <div class="row2">
+          <div class="fg">
+            <label class="fl">직급</label>
+            <input type="text" class="si" id="f_recommenderRank" value="${escHtml(f.formData.recommenderRank||'')}" onchange="composeState.formData.recommenderRank=this.value">
+          </div>
+          <div class="fg">
+            <label class="fl">연락처</label>
+            <input type="text" class="si" id="f_recommenderPhone" value="${escHtml(f.formData.recommenderPhone||'')}" onchange="composeState.formData.recommenderPhone=this.value">
+          </div>
+        </div>
+      </div>
+      <div class="form-paper" style="background:var(--bg3)">
+        <h3>🎁 추천 대상자 (입사자)</h3>
+        <div class="row2">
+          <div class="fg">
+            <label class="fl">성명<span class="req">*</span></label>
+            <input type="text" class="si" id="f_candidateName" value="${escHtml(f.formData.candidateName||'')}" onchange="composeState.formData.candidateName=this.value">
+          </div>
+          <div class="fg">
+            <label class="fl">부서/팀<span class="req">*</span></label>
+            <input type="text" class="si" id="f_candidateDept" value="${escHtml(f.formData.candidateDept||'')}" onchange="composeState.formData.candidateDept=this.value">
+          </div>
+        </div>
+        <div class="row2">
+          <div class="fg">
+            <label class="fl">직급</label>
+            <input type="text" class="si" id="f_candidateRank" placeholder="예: 과장3호" value="${escHtml(f.formData.candidateRank||'')}" onchange="composeState.formData.candidateRank=this.value">
+          </div>
+          <div class="fg">
+            <label class="fl">연락처</label>
+            <input type="text" class="si" id="f_candidatePhone" value="${escHtml(f.formData.candidatePhone||'')}" onchange="composeState.formData.candidatePhone=this.value">
+          </div>
+        </div>
+        <div class="row2">
+          <div class="fg">
+            <label class="fl">입사일자<span class="req">*</span></label>
+            <input type="date" class="si" id="f_candidateJoinDate" value="${f.formData.candidateJoinDate||''}" onchange="composeState.formData.candidateJoinDate=this.value">
+          </div>
+          <div class="fg">
+            <label class="fl">신청 금액 (원)<span class="req">*</span></label>
+            <input type="number" class="si" id="f_recommendAmount" placeholder="800000" value="${f.formData.recommendAmount||''}" onchange="composeState.formData.recommendAmount=this.value">
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:8px;padding:10px;background:var(--pd);border-left:3px solid var(--p);border-radius:6px;font-size:11px;color:var(--p)">
+        💡 엔젯(주) 인재추천보상규정에 의한 수당 신청
+      </div>
+    `;
+  } else if (f.formId === "CONGRATS_FUND") {
+    // 경조화금 신청
+    formHtml = `
+      <div class="fg">
+        <label class="fl">신청 종류<span class="req">*</span></label>
+        <select class="ss" id="f_congratsType" onchange="composeState.formData.congratsType=this.value;toggleCongratsFields()">
+          <option value="">선택</option>
+          <option value="경조 화환만" ${f.formData.congratsType==="경조 화환만"?"selected":""}>경조 화환만</option>
+          <option value="경조금만" ${f.formData.congratsType==="경조금만"?"selected":""}>경조금만</option>
+          <option value="경조 화환 + 경조금" ${f.formData.congratsType==="경조 화환 + 경조금"?"selected":""}>경조 화환 + 경조금</option>
+        </select>
+      </div>
+      <div class="form-paper">
+        <h3>🌸 경조사 정보</h3>
+        <div class="row2">
+          <div class="fg">
+            <label class="fl">대상자 성명<span class="req">*</span></label>
+            <input type="text" class="si" id="f_congratsTarget" placeholder="회사 임직원 이름" value="${escHtml(f.formData.congratsTarget||'')}" onchange="composeState.formData.congratsTarget=this.value">
+          </div>
+          <div class="fg">
+            <label class="fl">관계 / 사유</label>
+            <input type="text" class="si" id="f_congratsRelation" placeholder="예: 본인 결혼, 부친상" value="${escHtml(f.formData.congratsRelation||'')}" onchange="composeState.formData.congratsRelation=this.value">
+          </div>
+        </div>
+        <div class="row2">
+          <div class="fg">
+            <label class="fl">사유 발생일<span class="req">*</span></label>
+            <input type="date" class="si" id="f_congratsDate" value="${f.formData.congratsDate||''}" onchange="composeState.formData.congratsDate=this.value">
+          </div>
+          <div class="fg">
+            <label class="fl">소속 / 직위</label>
+            <input type="text" class="si" id="f_congratsDept" placeholder="예: 대표이사 / 본부장" value="${escHtml(f.formData.congratsDept||'')}" onchange="composeState.formData.congratsDept=this.value">
+          </div>
+        </div>
+      </div>
+      <div class="form-paper" style="background:var(--bg3)">
+        <h3>🌸 화환 정보 (해당 시)</h3>
+        <div class="row2">
+          <div class="fg">
+            <label class="fl">배송 요청 일시</label>
+            <input type="datetime-local" class="si" id="f_congratsDeliveryTime" value="${f.formData.congratsDeliveryTime||''}" onchange="composeState.formData.congratsDeliveryTime=this.value">
+          </div>
+          <div class="fg">
+            <label class="fl">받는 분 (명함)</label>
+            <input type="text" class="si" id="f_congratsRecipient" placeholder="예: 인벤티지랩 김주희 대표" value="${escHtml(f.formData.congratsRecipient||'')}" onchange="composeState.formData.congratsRecipient=this.value">
+          </div>
+        </div>
+        <div class="fg">
+          <label class="fl">장소</label>
+          <input type="text" class="si" id="f_congratsLocation" placeholder="예: 대구파티마병원장례식장" value="${escHtml(f.formData.congratsLocation||'')}" onchange="composeState.formData.congratsLocation=this.value">
+        </div>
+        <div class="row2">
+          <div class="fg">
+            <label class="fl">연락처</label>
+            <input type="text" class="si" id="f_congratsPhone" value="${escHtml(f.formData.congratsPhone||'')}" onchange="composeState.formData.congratsPhone=this.value">
+          </div>
+          <div class="fg">
+            <label class="fl">화환 종류</label>
+            <select class="ss" id="f_congratsFlowerType" onchange="composeState.formData.congratsFlowerType=this.value">
+              <option value="">선택</option>
+              <option value="난" ${f.formData.congratsFlowerType==="난"?"selected":""}>난</option>
+              <option value="관엽" ${f.formData.congratsFlowerType==="관엽"?"selected":""}>관엽</option>
+              <option value="화환" ${f.formData.congratsFlowerType==="화환"?"selected":""}>화환</option>
+              <option value="과일바구니" ${f.formData.congratsFlowerType==="과일바구니"?"selected":""}>과일바구니</option>
+              <option value="기타" ${f.formData.congratsFlowerType==="기타"?"selected":""}>기타</option>
+            </select>
+          </div>
+        </div>
+        <div class="fg">
+          <label class="fl">메시지</label>
+          <input type="text" class="si" id="f_congratsMessage" placeholder="예: 삼가 故人의 冥福을 빕니다" value="${escHtml(f.formData.congratsMessage||'')}" onchange="composeState.formData.congratsMessage=this.value">
+        </div>
+      </div>
+      <div class="form-paper" style="background:var(--bg3)">
+        <h3>💰 경조금 (해당 시)</h3>
+        <div class="row2">
+          <div class="fg">
+            <label class="fl">지급 방식</label>
+            <select class="ss" id="f_congratsPayMethod" onchange="composeState.formData.congratsPayMethod=this.value">
+              <option value="급여통장 입금" ${f.formData.congratsPayMethod==="급여통장 입금"?"selected":""}>급여통장 입금</option>
+              <option value="현금 지급" ${f.formData.congratsPayMethod==="현금 지급"?"selected":""}>현금 지급</option>
+            </select>
+          </div>
+          <div class="fg">
+            <label class="fl">지급 금액 (원)</label>
+            <input type="number" class="si" id="f_congratsAmount" placeholder="0" value="${f.formData.congratsAmount||''}" onchange="composeState.formData.congratsAmount=this.value">
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:8px;padding:10px;background:var(--pd);border-left:3px solid var(--p);border-radius:6px;font-size:11px;color:var(--p)">
+        💡 증빙 서류 첨부 필요 (부고/청첩장 등)
+      </div>
+    `;
   }
+  
+// 휴직 기간 자동 계산
+function calcLeaveDuration() {
+  const s = $("f_startDate")?.value;
+  const e = $("f_endDate")?.value;
+  if (s && e) {
+    const days = Math.floor((new Date(e) - new Date(s)) / (1000*60*60*24)) + 1;
+    const months = Math.round(days / 30);
+    const dur = months >= 1 ? `${months}개월 (${days}일)` : `${days}일`;
+    if ($("f_duration")) {
+      $("f_duration").value = dur;
+      if (composeState) composeState.formData.duration = dur;
+    }
+  }
+}
+
+// 자금일보 자동 계산
+function calcFundBalance() {
+  const prev = parseFloat($("f_prevBalance")?.value || 0);
+  const inc = parseFloat($("f_incomeTotal")?.value || 0);
+  const exp = parseFloat($("f_expenseTotal")?.value || 0);
+  const cur = prev + inc - exp;
+  if ($("f_currentBalance")) {
+    $("f_currentBalance").value = cur;
+    if (composeState) composeState.formData.currentBalance = cur;
+  }
+}
+
+// 현금출납장 자동 계산
+function calcCashBalance() {
+  const prev = parseFloat($("f_cashPrevBalance")?.value || 0);
+  const inc = parseFloat($("f_cashIncomeTotal")?.value || 0);
+  const exp = parseFloat($("f_cashExpenseTotal")?.value || 0);
+  const cur = prev + inc - exp;
+  if ($("f_cashFinalBalance")) {
+    $("f_cashFinalBalance").value = cur;
+    if (composeState) composeState.formData.cashFinalBalance = cur;
+  }
+}
+
+// 경조사 종류에 따라 필드 토글 (현재는 모든 필드 표시)
+function toggleCongratsFields() {
+  // 향후 종류별 필드 hide/show 처리
+}
 
   return `
     <div class="fg">
@@ -3271,6 +4101,245 @@ function renderFormDetail(a) {
         </div>
       </div>
       ${d.note ? `<div style="margin-top:8px"><strong>비고:</strong><br>${escHtml(d.note).replace(/\n/g,"<br>")}</div>` : ""}
+    `;
+  } else if (a.formId === "RETIRE_PARTIAL") {
+    return `
+      <div class="row2">
+        <div><strong>정산 희망일:</strong> ${escHtml(d.settleDate||"-")}</div>
+        <div><strong>입사일:</strong> ${escHtml(d.hireDate||"-")}</div>
+      </div>
+      <div style="margin-top:10px"><strong>신청 사유:</strong> <span class="badge">${escHtml(d.reason||"-")}</span></div>
+      ${d.reasonDetail ? `<div style="margin-top:8px"><strong>사유 상세:</strong><br>${escHtml(d.reasonDetail).replace(/\n/g,"<br>")}</div>` : ""}
+      <div style="margin-top:14px;padding:12px;background:var(--bg3);border-radius:8px">
+        <div style="font-weight:700;margin-bottom:8px">🏦 수령 정보</div>
+        <div class="row2">
+          <div><strong>은행:</strong> ${escHtml(d.bankName||"-")}</div>
+          <div><strong>예금주:</strong> ${escHtml(d.accountHolder||"-")}</div>
+        </div>
+        <div style="margin-top:6px"><strong>계좌번호:</strong> ${escHtml(d.accountNumber||"-")}</div>
+      </div>
+    `;
+  } else if (a.formId === "HIRING") {
+    return `
+      <div class="row2">
+        <div><strong>채용 사유:</strong> <span class="badge">${escHtml(d.hireReason||"-")}</span></div>
+        <div><strong>채용 구분:</strong> ${escHtml(d.hireType||"-")}</div>
+      </div>
+      <div class="row2" style="margin-top:8px">
+        <div><strong>채용 부서:</strong> ${escHtml(d.targetDept||"-")}</div>
+        <div><strong>희망 직급:</strong> ${escHtml(d.targetRank||"-")}</div>
+      </div>
+      <div class="row2" style="margin-top:8px">
+        <div><strong>근무 시작:</strong> ${escHtml(d.startDate||"-")}</div>
+        <div><strong>담당 업무:</strong> ${escHtml(d.targetJob||"-")}</div>
+      </div>
+      <div style="margin-top:10px;padding:10px;background:var(--bg3);border-radius:6px;font-size:12px">
+        <strong>인력 요건:</strong> ${escHtml(d.career||"-")} · ${escHtml(d.education||"-")} · ${escHtml(d.gender||"-")}
+      </div>
+      ${d.requirements ? `<div style="margin-top:10px"><strong>자격 요건/우대사항:</strong><br><div style="font-size:13px;white-space:pre-wrap;margin-top:4px">${escHtml(d.requirements)}</div></div>` : ""}
+    `;
+  } else if (a.formId === "RESIGN") {
+    return `
+      <div class="row2">
+        <div><strong>사직 예정일:</strong> ${escHtml(d.resignDate||"-")}</div>
+        <div><strong>입사일:</strong> ${escHtml(d.hireDate||"-")}</div>
+      </div>
+      <div style="margin-top:10px"><strong>사직 사유:</strong> ${escHtml(d.resignReason||"-")}</div>
+      ${d.resignDetail ? `<div style="margin-top:8px"><strong>사유 상세:</strong><br>${escHtml(d.resignDetail).replace(/\n/g,"<br>")}</div>` : ""}
+      <div style="margin-top:10px"><strong>인수인계 계획:</strong><br>${escHtml(d.handover||"-").replace(/\n/g,"<br>")}</div>
+    `;
+  } else if (a.formId === "LEAVE_ABSENCE") {
+    return `
+      <div class="row2">
+        <div><strong>휴직 시작:</strong> ${escHtml(d.startDate||"-")}</div>
+        <div><strong>휴직 종료:</strong> ${escHtml(d.endDate||"-")}</div>
+      </div>
+      <div style="margin-top:8px"><strong>휴직 기간:</strong> ${escHtml(d.duration||"-")}</div>
+      <div style="margin-top:8px"><strong>휴직 사유:</strong> <span class="badge">${escHtml(d.leaveReason||"-")}</span></div>
+      ${d.leaveDetail ? `<div style="margin-top:8px"><strong>사유 상세:</strong><br>${escHtml(d.leaveDetail).replace(/\n/g,"<br>")}</div>` : ""}
+      <div class="row2" style="margin-top:10px;padding:10px;background:var(--bg3);border-radius:6px">
+        <div><strong>주소:</strong> ${escHtml(d.address||"-")}</div>
+        <div><strong>휴대폰:</strong> ${escHtml(d.contactPhone||"-")}</div>
+      </div>
+    `;
+  } else if (a.formId === "REASON_NOTE") {
+    return `
+      <div style="padding:10px;background:var(--bg3);border-radius:6px">
+        <div style="font-weight:700;margin-bottom:6px">👤 인적사항</div>
+        <div class="row2">
+          <div>${escHtml(d.targetName||"-")} (${escHtml(d.targetRank||"-")})</div>
+          <div>${escHtml(d.targetDept||"-")} · ${escHtml(d.targetPhone||"-")}</div>
+        </div>
+      </div>
+      <div style="margin-top:10px"><strong>발생일:</strong> ${escHtml(d.incidentDate||"-")}</div>
+      <div style="margin-top:10px"><strong>소명 내용:</strong></div>
+      <div style="margin-top:4px;padding:12px;background:#fef9c3;border-left:4px solid #ca8a04;border-radius:6px;white-space:pre-wrap;font-size:13px">${escHtml(d.reasonContent||"-")}</div>
+    `;
+  } else if (a.formId === "BUSINESS_CARD") {
+    return `
+      <div style="padding:14px;background:linear-gradient(135deg,#1a6fd4,#0f4c81);border-radius:10px;color:#fff;margin-bottom:14px">
+        <div style="font-size:11px;opacity:0.85;margin-bottom:4px">${escHtml(d.cardEnDept||"")}</div>
+        <div style="font-size:22px;font-weight:800;margin-bottom:4px">${escHtml(d.cardKoName||"-")}</div>
+        <div style="font-size:13px;opacity:0.95;margin-bottom:2px">${escHtml(d.cardRank||"-")}</div>
+        <div style="font-size:11px;opacity:0.8">${escHtml(d.cardEnName||"")} · ${escHtml(d.cardEnRank||"")}</div>
+      </div>
+      <div class="row2">
+        <div><strong>본부/팀:</strong> ${escHtml(d.cardDept||"-")} / ${escHtml(d.cardTeam||"-")}</div>
+        <div><strong>이메일:</strong> ${escHtml(d.cardEmail||"-")}</div>
+      </div>
+      <div class="row2" style="margin-top:8px">
+        <div><strong>내선:</strong> ${escHtml(d.cardOfficePhone||"-")}</div>
+        <div><strong>휴대폰:</strong> ${escHtml(d.cardMobile||"-")}</div>
+      </div>
+      <div style="margin-top:8px"><strong>수량:</strong> ${escHtml(d.cardQty||"100")} 매</div>
+    `;
+  } else if (a.formId === "FUEL_REIMB") {
+    return `
+      <div class="row2">
+        <div><strong>정산 월:</strong> ${escHtml(d.fuelMonth||"-")}</div>
+        <div><strong>차량:</strong> ${escHtml(d.fuelCarNumber||"-")} (${escHtml(d.fuelCarType||"-")})</div>
+      </div>
+      <div class="row2" style="margin-top:8px">
+        <div><strong>연료:</strong> ${escHtml(d.fuelType||"-")}</div>
+        <div><strong>연비:</strong> ${escHtml(d.fuelEfficiency||"-")} km/L</div>
+      </div>
+      <div style="margin-top:8px"><strong>유가 기준:</strong> ${escHtml(d.fuelPrice||"-")} 원/L</div>
+      <div style="margin-top:14px;padding:12px;background:var(--bg3);border-radius:8px">
+        <div style="font-weight:700;margin-bottom:8px">⛽ 운행 내역</div>
+        <div style="font-family:monospace;font-size:11px;white-space:pre-wrap;max-height:300px;overflow-y:auto">${escHtml(d.fuelTrips||"-")}</div>
+      </div>
+      <div style="margin-top:10px;padding:10px;background:linear-gradient(135deg,#1a6fd4,#0f4c81);color:#fff;border-radius:8px;text-align:center">
+        <div style="font-size:11px;opacity:0.85">총 정산 금액</div>
+        <div style="font-size:22px;font-weight:900">${fmtMoney(d.fuelTotal||0)} 원</div>
+      </div>
+    `;
+  } else if (a.formId === "FUND_REPORT") {
+    return `
+      <div><strong>일자:</strong> ${escHtml(d.reportDate||"-")}</div>
+      <div class="row2" style="margin-top:10px;padding:14px;background:var(--bg3);border-radius:8px">
+        <div>
+          <div style="font-size:11px;color:var(--t3)">전일 잔액</div>
+          <div style="font-weight:700">${fmtMoney(d.prevBalance||0)} 원</div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--t3)">당일 잔액</div>
+          <div style="font-weight:800;color:var(--p);font-size:18px">${fmtMoney(d.currentBalance||0)} 원</div>
+        </div>
+      </div>
+      <div class="row2" style="margin-top:10px">
+        <div style="padding:10px;background:#d1fae5;border-radius:6px;text-align:center">
+          <div style="font-size:11px;color:#065f46">📥 총 입금</div>
+          <div style="font-weight:700;color:#065f46">${fmtMoney(d.incomeTotal||0)} 원</div>
+        </div>
+        <div style="padding:10px;background:#fee2e2;border-radius:6px;text-align:center">
+          <div style="font-size:11px;color:#991b1b">📤 총 출금</div>
+          <div style="font-weight:700;color:#991b1b">${fmtMoney(d.expenseTotal||0)} 원</div>
+        </div>
+      </div>
+      ${d.incomeDetails ? `<div style="margin-top:10px"><strong>📥 입금 내역:</strong><div style="font-family:monospace;font-size:11px;padding:8px;background:var(--bg3);border-radius:6px;margin-top:4px;white-space:pre-wrap">${escHtml(d.incomeDetails)}</div></div>` : ""}
+      ${d.expenseDetails ? `<div style="margin-top:10px"><strong>📤 출금 내역:</strong><div style="font-family:monospace;font-size:11px;padding:8px;background:var(--bg3);border-radius:6px;margin-top:4px;white-space:pre-wrap">${escHtml(d.expenseDetails)}</div></div>` : ""}
+    `;
+  } else if (a.formId === "CASH_LOG") {
+    return `
+      <div class="row2">
+        <div><strong>정산 월:</strong> ${escHtml(d.cashMonth||"-")}</div>
+        <div><strong>부서:</strong> ${escHtml(d.cashDept||"-")}</div>
+      </div>
+      <div class="row2" style="margin-top:10px;padding:14px;background:var(--bg3);border-radius:8px">
+        <div>
+          <div style="font-size:11px;color:var(--t3)">전월 이월</div>
+          <div style="font-weight:700">${fmtMoney(d.cashPrevBalance||0)} 원</div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--t3)">최종 잔액</div>
+          <div style="font-weight:800;color:var(--p);font-size:18px">${fmtMoney(d.cashFinalBalance||0)} 원</div>
+        </div>
+      </div>
+      <div class="row2" style="margin-top:10px">
+        <div style="padding:8px;background:#d1fae5;border-radius:6px;text-align:center">
+          <div style="font-size:11px;color:#065f46">입금</div>
+          <div style="font-weight:700;color:#065f46">${fmtMoney(d.cashIncomeTotal||0)} 원</div>
+        </div>
+        <div style="padding:8px;background:#fee2e2;border-radius:6px;text-align:center">
+          <div style="font-size:11px;color:#991b1b">출금</div>
+          <div style="font-weight:700;color:#991b1b">${fmtMoney(d.cashExpenseTotal||0)} 원</div>
+        </div>
+      </div>
+      ${d.cashItems ? `<div style="margin-top:10px"><strong>💴 사용 내역:</strong><div style="font-family:monospace;font-size:11px;padding:8px;background:var(--bg3);border-radius:6px;margin-top:4px;white-space:pre-wrap;max-height:300px;overflow-y:auto">${escHtml(d.cashItems)}</div></div>` : ""}
+    `;
+  } else if (a.formId === "CARD_LIMIT") {
+    return `
+      <div class="row2">
+        <div><strong>카드번호:</strong> ${escHtml(d.cardNumber||"-")}</div>
+        <div><strong>사용자:</strong> ${escHtml(d.cardUsers||"-")}</div>
+      </div>
+      <div class="row2" style="margin-top:8px">
+        <div><strong>현재 한도:</strong> ${fmtMoney(d.currentLimit||0)} 원</div>
+        <div><strong>잔여 한도:</strong> ${fmtMoney(d.remainingLimit||0)} 원</div>
+      </div>
+      <div class="row2" style="margin-top:8px">
+        <div><strong>사용 예정:</strong> ${fmtMoney(d.useAmount||0)} 원</div>
+        <div><strong>증액 요청:</strong> <span style="color:var(--p);font-weight:700">${fmtMoney(d.increaseAmount||0)} 원</span></div>
+      </div>
+      <div style="margin-top:10px"><strong>증액 목적:</strong><br>${escHtml(d.increaseReason||"-").replace(/\n/g,"<br>")}</div>
+      ${d.note ? `<div style="margin-top:8px"><strong>비고:</strong> ${escHtml(d.note)}</div>` : ""}
+    `;
+  } else if (a.formId === "RECOMMEND_PAYMENT") {
+    return `
+      <div style="padding:12px;background:var(--bg3);border-radius:8px;margin-bottom:10px">
+        <div style="font-weight:700;margin-bottom:6px">👤 신청인 (추천자)</div>
+        <div class="row2">
+          <div>${escHtml(d.recommenderName||"-")} (${escHtml(d.recommenderRank||"-")})</div>
+          <div>${escHtml(d.recommenderDept||"-")} · ${escHtml(d.recommenderPhone||"-")}</div>
+        </div>
+      </div>
+      <div style="padding:12px;background:#ede9fe;border-left:4px solid #7c3aed;border-radius:8px;margin-bottom:10px">
+        <div style="font-weight:700;margin-bottom:6px">🎁 추천 대상자 (입사자)</div>
+        <div class="row2">
+          <div><strong>${escHtml(d.candidateName||"-")}</strong> (${escHtml(d.candidateRank||"-")})</div>
+          <div>${escHtml(d.candidateDept||"-")} · ${escHtml(d.candidatePhone||"-")}</div>
+        </div>
+        <div style="margin-top:6px;font-size:12px;color:var(--t3)">입사일: ${escHtml(d.candidateJoinDate||"-")}</div>
+      </div>
+      <div style="margin-top:10px;padding:14px;background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;border-radius:8px;text-align:center">
+        <div style="font-size:11px;opacity:0.85">신청 금액</div>
+        <div style="font-size:24px;font-weight:900">${fmtMoney(d.recommendAmount||0)} 원</div>
+      </div>
+    `;
+  } else if (a.formId === "CONGRATS_FUND") {
+    return `
+      <div><strong>신청 종류:</strong> <span class="badge">${escHtml(d.congratsType||"-")}</span></div>
+      <div style="padding:12px;background:var(--bg3);border-radius:8px;margin-top:10px">
+        <div style="font-weight:700;margin-bottom:6px">🌸 경조사 정보</div>
+        <div class="row2">
+          <div><strong>대상자:</strong> ${escHtml(d.congratsTarget||"-")}</div>
+          <div><strong>관계/사유:</strong> ${escHtml(d.congratsRelation||"-")}</div>
+        </div>
+        <div class="row2" style="margin-top:6px">
+          <div><strong>발생일:</strong> ${escHtml(d.congratsDate||"-")}</div>
+          <div><strong>소속/직위:</strong> ${escHtml(d.congratsDept||"-")}</div>
+        </div>
+      </div>
+      ${d.congratsLocation ? `
+        <div style="padding:12px;background:#fce7f3;border-left:4px solid #ec4899;border-radius:8px;margin-top:10px">
+          <div style="font-weight:700;margin-bottom:6px">🌸 화환 정보</div>
+          <div class="row2">
+            <div><strong>장소:</strong> ${escHtml(d.congratsLocation||"-")}</div>
+            <div><strong>받는분:</strong> ${escHtml(d.congratsRecipient||"-")}</div>
+          </div>
+          <div class="row2" style="margin-top:6px">
+            <div><strong>배송:</strong> ${escHtml(d.congratsDeliveryTime||"-")}</div>
+            <div><strong>종류:</strong> ${escHtml(d.congratsFlowerType||"-")}</div>
+          </div>
+          ${d.congratsMessage ? `<div style="margin-top:6px"><strong>메시지:</strong> "${escHtml(d.congratsMessage)}"</div>` : ""}
+        </div>
+      ` : ""}
+      ${d.congratsAmount && parseFloat(d.congratsAmount) > 0 ? `
+        <div style="margin-top:10px;padding:14px;background:linear-gradient(135deg,#1a6fd4,#0f4c81);color:#fff;border-radius:8px;text-align:center">
+          <div style="font-size:11px;opacity:0.85">💰 경조금 ${escHtml(d.congratsPayMethod||"")}</div>
+          <div style="font-size:22px;font-weight:900">${fmtMoney(d.congratsAmount||0)} 원</div>
+        </div>
+      ` : ""}
     `;
   }
   return `<pre style="font-size:13px;color:var(--t2)">${escHtml(JSON.stringify(d, null, 2))}</pre>`;
