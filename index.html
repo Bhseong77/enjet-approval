@@ -5305,12 +5305,83 @@ async function onOK() {
     $("syncTxt").textContent = "✅ 동기화 완료";
     renderHome();
     updateInboxBadge();
+    // ── URL 파라미터 처리 (watcher가 열어준 경우) ──
+    _handleUrlParams();
   } catch (e) {
     $("syncDot").className = "dot err";
     $("syncTxt").textContent = "❌ 로드 실패";
     console.error(e);
     toast("데이터 로딩 실패: " + e.message, "error");
   }
+}
+
+// ════════════════════════════════════════════════════════════════════
+// URL 파라미터 처리 - erp_approval_watcher가 열어준 경우 자동 품의서 작성
+// ?action=new_purchase&erpReqNo=20260527-0001&erpTblKey=4948&dept=경영전략본부&...
+// ════════════════════════════════════════════════════════════════════
+function _handleUrlParams() {
+  const p = new URLSearchParams(location.search);
+  if (p.get("action") !== "new_purchase") return;
+
+  const erpReqNo  = p.get("erpReqNo")  || "";
+  const erpTblKey = p.get("erpTblKey") || "";
+  const dept      = p.get("dept")      || "";
+  const drafter   = p.get("drafter")   || "";
+  const itemName  = p.get("itemName")  || "";
+  const reqDate   = p.get("reqDate")   || "";
+
+  if (!erpReqNo && !erpTblKey) return;
+
+  console.log(`[URL파라미터] ERP 구매품의 자동 작성: ${erpReqNo} / ${dept}`);
+
+  // 구매품의 양식으로 바로 시작
+  const tmpl = FORM_TEMPLATES.find(f => f.id === "PURCHASE_REQUEST");
+  if (!tmpl) { toast("구매품의 양식을 찾을 수 없습니다", "error"); return; }
+
+  const preset = approvalLines["PURCHASE_REQUEST"];
+  const ccList = (preset && preset.ccs) ? preset.ccs.map(c => ({...c})) : [];
+
+  composeState = {
+    id: newId("AP"),
+    formId: "PURCHASE_REQUEST",
+    formName: "구매품의",
+    formIcon: tmpl.icon || "🛒",
+    title: `(PMS)구매요청_${dept}_${erpReqNo}`,
+    drafter: {
+      email: myProfile["ID(email)"],
+      name:  myProfile["성명"],
+      rank:  myProfile["직급"],
+      dept:  dept || myProfile["부서"],
+      team:  myProfile["팀"] || ""
+    },
+    formData: {
+      erpReqNo:   erpReqNo,
+      erpTblKey:  erpTblKey,
+      dept:       dept,
+      reqDate:    reqDate || new Date().toISOString().slice(0,10),
+      itemName:   itemName,
+      source:     "erp_watcher"
+    },
+    approvalLine: [],
+    ccList: ccList,
+    attachments: [],
+    urgency: "보통",
+    status: "작성중",
+    currentStep: 0,
+    createdAt: now(),
+    updatedAt: now()
+  };
+
+  // URL 파라미터 제거 (뒤로가기 시 재실행 방지)
+  const cleanUrl = location.pathname;
+  history.replaceState({}, "", cleanUrl);
+
+  // 결재라인 자동 구성 후 모달 오픈
+  setTimeout(() => {
+    openComposeModal();
+    updateApprovalLine();
+    toast(`📋 ERP 구매요청 ${erpReqNo} 품의서가 자동 작성됐습니다. 결재자 확인 후 상신하세요.`, "info");
+  }, 300);
 }
 
 // ━━ 시작 ━━
