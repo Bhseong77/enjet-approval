@@ -4136,18 +4136,141 @@ function renderFormDetail(a) {
       <div style="margin-top:8px"><strong>지출 사유:</strong><br>${escHtml(d.reason||"").replace(/\n/g,"<br>")}</div>
     `;
   } else if (a.formId === "PURCHASE_REQUEST") {
-    return `
-      <div class="row2">
-        <div><strong>프로젝트:</strong> ${escHtml(d.pjCode||"-")}</div>
-        <div><strong>PR 코드:</strong> ${escHtml(d.prCode||"-")}</div>
+    // PDF와 동일한 구매요청서 양식
+    const items = d.items || [];
+    // 다양한 소스에서 필드 추출 (erp_approval_submit, es_bom_module, purchase_dashboard 등)
+    const reqNo   = d.erpReqNo || d.erpApNo || d.prCode || "-";
+    const reqDate = d.requestDate || d.reqDate || (a.createdAt||"").slice(0,10) || "-";
+    const dept    = d.dept || a.drafter?.dept || "-";
+    const drafter = a.drafter?.name || a.drafterName || "-";
+    const reqType = d.purchaseType || d.reqType || "기타요청";
+    const totalQty = d.totalQty || items.reduce((s,i)=>s+(parseFloat(i.qty)||0),0) || 0;
+    const projCode = d.projectCode || d.erpTblKey || "-";
+    const note    = d.specialNote || d.note || "";
+
+    const itemRows = items.length > 0 ? items.map((it, i) => `
+      <tr>
+        <td style="text-align:center;border:1px solid #ccc;padding:5px 4px">${i+1}</td>
+        <td style="border:1px solid #ccc;padding:5px 8px">${escHtml(it.name||it.partName||"-")}</td>
+        <td style="border:1px solid #ccc;padding:5px 8px;font-size:11px">${escHtml(it.partno||it.partNo||"")}</td>
+        <td style="border:1px solid #ccc;padding:5px 8px;font-size:11px">${escHtml(it.spec||"")}</td>
+        <td style="text-align:center;border:1px solid #ccc;padding:5px 4px">${escHtml(it.unit||"EA")}</td>
+        <td style="text-align:center;border:1px solid #ccc;padding:5px 4px">${escHtml(it.dueDate||d.dueDate||"")}</td>
+        <td style="border-bottom:1px solid #ccc;border-right:1px solid #ccc;padding:4px 8px;font-size:11px">${escHtml(it.projectName||projCode||"")}</td>
+        <td style="border-bottom:1px solid #ccc;border-right:1px solid #ccc;padding:4px 8px;font-size:11px"></td>
+        <td style="border-bottom:1px solid #ccc;border-right:1px solid #ccc;padding:4px 8px;font-size:11px">${escHtml(it.supplier||it.vendor||it.maker||"")}</td>
+        <td style="text-align:right;border-bottom:1px solid #ccc;border-right:1px solid #ccc;padding:4px 8px">${parseFloat(it.qty)||0}</td>
+        <td style="border-bottom:1px solid #ccc;border-right:1px solid #ccc;padding:4px 8px;font-size:11px">${escHtml(it.maker||"")}</td>
+      </tr>
+    `).join("") : `<tr><td colspan="11" style="text-align:center;padding:12px;color:#999;border:1px solid #ccc">품목 없음</td></tr>`;
+
+    return \`
+      <style>
+        .pr-doc { font-family:'Malgun Gothic','맑은 고딕',sans-serif;font-size:13px;color:#222;max-width:900px;margin:0 auto }
+        .pr-title { text-align:center;font-size:22px;font-weight:900;letter-spacing:6px;padding:18px 0 14px }
+        .pr-top { display:grid;grid-template-columns:1fr 1fr;gap:0;border-top:1.5px solid #333 }
+        .pr-info-table { border-collapse:collapse;width:100% }
+        .pr-info-table th { background:#f5f5f5;border:1px solid #ccc;padding:5px 10px;font-size:12px;font-weight:700;white-space:nowrap;width:100px }
+        .pr-info-table td { border:1px solid #ccc;padding:5px 10px;font-size:13px }
+        .pr-sign-table { border-collapse:collapse;width:100%;height:100% }
+        .pr-sign-table th { border:1px solid #ccc;padding:4px 6px;font-size:11px;text-align:center;background:#f5f5f5 }
+        .pr-sign-table td { border:1px solid #ccc;padding:4px 6px;font-size:11px;text-align:center;min-width:55px;height:50px;vertical-align:middle }
+        .pr-body-table { border-collapse:collapse;width:100%;margin-top:10px }
+        .pr-body-table th { background:#e6e8eb;border:1px solid #ccc;padding:6px 6px;font-size:12px;font-weight:700;text-align:center }
+        .pr-item-table { border-collapse:collapse;width:100%;margin-top:4px }
+        .pr-item-table th { background:#e6e8eb;border:1px solid #ccc;padding:5px 4px;font-size:11px;font-weight:700;text-align:center }
+      </style>
+      <div class="pr-doc">
+        <div class="pr-title">구 매 요 청 서</div>
+
+        <div class="pr-top">
+          <!-- 좌: 기안자 정보 -->
+          <div style="border-right:1px solid #ccc">
+            <table class="pr-info-table">
+              <tr><th>기안자</th><td>\${escHtml(drafter)}</td></tr>
+              <tr><th>소속</th><td>\${escHtml(dept)}</td></tr>
+              <tr><th>기안일</th><td>\${escHtml(reqDate)}</td></tr>
+              <tr><th>문서번호</th><td>\${escHtml(a.id)}</td></tr>
+            </table>
+          </div>
+          <!-- 우: 결재란 -->
+          <div>
+            <table class="pr-sign-table">
+              <thead>
+                <tr>
+                  \${(a.approvalLine||[]).map(s => \`<th>\${escHtml(s.rank||s.role||"결재")}</th>\`).join("")}
+                  \${(a.approvalLine||[]).length === 0 ? "<th>결재</th>" : ""}
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  \${(a.approvalLine||[]).map((s,i) => {
+                    const isDone = s.status === "승인";
+                    const isCurr = i === (a.currentStep||0) && a.status === "진행중";
+                    return \`<td style="position:relative">
+                      \${isDone ? \`<div style="position:absolute;inset:2px;display:flex;align-items:center;justify-content:center;flex-direction:column">
+                        <div style="border:2px solid #c00;border-radius:50%;padding:2px 6px;color:#c00;font-weight:800;font-size:13px">승인</div>
+                        <div style="font-size:10px;color:#555;margin-top:2px">\${escHtml(s.name)}</div>
+                        <div style="font-size:10px;color:#888">\${(s.actionDate||"").slice(0,10)}</div>
+                      </div>\` : isCurr ? \`<div style="text-align:center;color:#1e40af;font-weight:700;font-size:11px">⏳대기<br>\${escHtml(s.name)}</div>\` : \`<div style="text-align:center;color:#aaa;font-size:11px">\${escHtml(s.name)}</div>\`}
+                    </td>\`;
+                  }).join("")}
+                  \${(a.approvalLine||[]).length === 0 ? "<td></td>" : ""}
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 본문 -->
+        <table class="pr-body-table" style="margin-top:0">
+          <tr>
+            <th style="width:120px">요청번호</th><td>\${escHtml(reqNo)}</td>
+            <th style="width:80px">요청일</th><td>\${escHtml(reqDate)}</td>
+          </tr>
+          <tr>
+            <th>요청부서</th><td>\${escHtml(dept)}</td>
+            <th>요청담당자</th><td>\${escHtml(drafter)}</td>
+          </tr>
+          <tr>
+            <th>구매요청구분</th><td>\${escHtml(reqType)}</td>
+            <th>총수량</th><td>\${totalQty.toLocaleString()}</td>
+          </tr>
+          <tr>
+            <th>특이사항</th><td colspan="3">\${escHtml(note)}</td>
+          </tr>
+        </table>
+
+        <!-- 품목 테이블 -->
+        <table class="pr-item-table" style="margin-top:8px">
+          <thead>
+            <tr>
+              <th rowspan="2" style="width:36px">No</th>
+              <th style="min-width:140px">품명</th>
+              <th style="min-width:100px">품번</th>
+              <th style="min-width:100px">규격</th>
+              <th style="width:50px">단위</th>
+              <th style="width:90px">납기요청일</th>
+            </tr>
+            <tr>
+              <th>프로젝트명</th>
+              <th>프로젝트번호</th>
+              <th>구매거래처</th>
+              <th>수량</th>
+              <th>제조사</th>
+            </tr>
+          </thead>
+          <tbody>\${itemRows}</tbody>
+          <tfoot>
+            <tr>
+              <th colspan="5" style="border:1px solid #ccc;padding:5px 8px;text-align:center">합계</th>
+              <td colspan="5" style="border:1px solid #ccc;padding:5px 8px;text-align:right;font-weight:800">\${totalQty.toLocaleString()}</td>
+              <td style="border:1px solid #ccc"></td>
+            </tr>
+          </tfoot>
+        </table>
       </div>
-      <div class="row2" style="margin-top:8px">
-        <div><strong>총 금액:</strong> ${fmtMoney(d.totalAmount)} 원</div>
-        <div><strong>거래처:</strong> ${escHtml(d.vendor||"-")}</div>
-      </div>
-      <div style="margin-top:8px"><strong>필요시점:</strong> ${escHtml(d.dueDate||"-")}</div>
-      <div style="margin-top:8px"><strong>구매 사유:</strong><br>${escHtml(d.reason||"").replace(/\n/g,"<br>")}</div>
-    `;
+    \`;
   } else if (a.formId === "QUOTE_APPROVAL") {
     return `
       <div class="row2">
@@ -5305,83 +5428,12 @@ async function onOK() {
     $("syncTxt").textContent = "✅ 동기화 완료";
     renderHome();
     updateInboxBadge();
-    // ── URL 파라미터 처리 (watcher가 열어준 경우) ──
-    _handleUrlParams();
   } catch (e) {
     $("syncDot").className = "dot err";
     $("syncTxt").textContent = "❌ 로드 실패";
     console.error(e);
     toast("데이터 로딩 실패: " + e.message, "error");
   }
-}
-
-// ════════════════════════════════════════════════════════════════════
-// URL 파라미터 처리 - erp_approval_watcher가 열어준 경우 자동 품의서 작성
-// ?action=new_purchase&erpReqNo=20260527-0001&erpTblKey=4948&dept=경영전략본부&...
-// ════════════════════════════════════════════════════════════════════
-function _handleUrlParams() {
-  const p = new URLSearchParams(location.search);
-  if (p.get("action") !== "new_purchase") return;
-
-  const erpReqNo  = p.get("erpReqNo")  || "";
-  const erpTblKey = p.get("erpTblKey") || "";
-  const dept      = p.get("dept")      || "";
-  const drafter   = p.get("drafter")   || "";
-  const itemName  = p.get("itemName")  || "";
-  const reqDate   = p.get("reqDate")   || "";
-
-  if (!erpReqNo && !erpTblKey) return;
-
-  console.log(`[URL파라미터] ERP 구매품의 자동 작성: ${erpReqNo} / ${dept}`);
-
-  // 구매품의 양식으로 바로 시작
-  const tmpl = FORM_TEMPLATES.find(f => f.id === "PURCHASE_REQUEST");
-  if (!tmpl) { toast("구매품의 양식을 찾을 수 없습니다", "error"); return; }
-
-  const preset = approvalLines["PURCHASE_REQUEST"];
-  const ccList = (preset && preset.ccs) ? preset.ccs.map(c => ({...c})) : [];
-
-  composeState = {
-    id: newId("AP"),
-    formId: "PURCHASE_REQUEST",
-    formName: "구매품의",
-    formIcon: tmpl.icon || "🛒",
-    title: `(PMS)구매요청_${dept}_${erpReqNo}`,
-    drafter: {
-      email: myProfile["ID(email)"],
-      name:  myProfile["성명"],
-      rank:  myProfile["직급"],
-      dept:  dept || myProfile["부서"],
-      team:  myProfile["팀"] || ""
-    },
-    formData: {
-      erpReqNo:   erpReqNo,
-      erpTblKey:  erpTblKey,
-      dept:       dept,
-      reqDate:    reqDate || new Date().toISOString().slice(0,10),
-      itemName:   itemName,
-      source:     "erp_watcher"
-    },
-    approvalLine: [],
-    ccList: ccList,
-    attachments: [],
-    urgency: "보통",
-    status: "작성중",
-    currentStep: 0,
-    createdAt: now(),
-    updatedAt: now()
-  };
-
-  // URL 파라미터 제거 (뒤로가기 시 재실행 방지)
-  const cleanUrl = location.pathname;
-  history.replaceState({}, "", cleanUrl);
-
-  // 결재라인 자동 구성 후 모달 오픈
-  setTimeout(() => {
-    openComposeModal();
-    updateApprovalLine();
-    toast(`📋 ERP 구매요청 ${erpReqNo} 품의서가 자동 작성됐습니다. 결재자 확인 후 상신하세요.`, "info");
-  }, 300);
 }
 
 // ━━ 시작 ━━
