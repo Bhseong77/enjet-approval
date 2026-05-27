@@ -4136,9 +4136,8 @@ function renderFormDetail(a) {
       <div style="margin-top:8px"><strong>지출 사유:</strong><br>${escHtml(d.reason||"").replace(/\n/g,"<br>")}</div>
     `;
   } else if (a.formId === "PURCHASE_REQUEST") {
-    // PDF와 동일한 구매요청서 양식
+    const d = a.formData || {};
     const items = d.items || [];
-    // 다양한 소스에서 필드 추출 (erp_approval_submit, es_bom_module, purchase_dashboard 등)
     const reqNo   = d.erpReqNo || d.erpApNo || d.prCode || "-";
     const reqDate = d.requestDate || d.reqDate || (a.createdAt||"").slice(0,10) || "-";
     const dept    = d.dept || a.drafter?.dept || "-";
@@ -4146,131 +4145,110 @@ function renderFormDetail(a) {
     const reqType = d.purchaseType || d.reqType || "기타요청";
     const totalQty = d.totalQty || items.reduce((s,i)=>s+(parseFloat(i.qty)||0),0) || 0;
     const projCode = d.projectCode || d.erpTblKey || "-";
-    const note    = d.specialNote || d.note || "";
+    const note     = d.specialNote || d.note || "";
+    const approvalLine = a.approvalLine || [];
 
-    const itemRows = items.length > 0 ? items.map((it, i) => `
-      <tr>
-        <td style="text-align:center;border:1px solid #ccc;padding:5px 4px">${i+1}</td>
-        <td style="border:1px solid #ccc;padding:5px 8px">${escHtml(it.name||it.partName||"-")}</td>
-        <td style="border:1px solid #ccc;padding:5px 8px;font-size:11px">${escHtml(it.partno||it.partNo||"")}</td>
-        <td style="border:1px solid #ccc;padding:5px 8px;font-size:11px">${escHtml(it.spec||"")}</td>
-        <td style="text-align:center;border:1px solid #ccc;padding:5px 4px">${escHtml(it.unit||"EA")}</td>
-        <td style="text-align:center;border:1px solid #ccc;padding:5px 4px">${escHtml(it.dueDate||d.dueDate||"")}</td>
-        <td style="border-bottom:1px solid #ccc;border-right:1px solid #ccc;padding:4px 8px;font-size:11px">${escHtml(it.projectName||projCode||"")}</td>
-        <td style="border-bottom:1px solid #ccc;border-right:1px solid #ccc;padding:4px 8px;font-size:11px"></td>
-        <td style="border-bottom:1px solid #ccc;border-right:1px solid #ccc;padding:4px 8px;font-size:11px">${escHtml(it.supplier||it.vendor||it.maker||"")}</td>
-        <td style="text-align:right;border-bottom:1px solid #ccc;border-right:1px solid #ccc;padding:4px 8px">${parseFloat(it.qty)||0}</td>
-        <td style="border-bottom:1px solid #ccc;border-right:1px solid #ccc;padding:4px 8px;font-size:11px">${escHtml(it.maker||"")}</td>
-      </tr>
-    `).join("") : `<tr><td colspan="11" style="text-align:center;padding:12px;color:#999;border:1px solid #ccc">품목 없음</td></tr>`;
+    // 결재란 HTML
+    const signHeaders = approvalLine.map(s =>
+      '<th style="border:1px solid #ccc;padding:4px 6px;font-size:11px;text-align:center;background:#f5f5f5">'
+      + escHtml(s.rank||s.role||"결재") + '</th>'
+    ).join("") || '<th style="border:1px solid #ccc;padding:4px 6px;font-size:11px;text-align:center;background:#f5f5f5">결재</th>';
 
-    return \`
-      <style>
-        .pr-doc { font-family:'Malgun Gothic','맑은 고딕',sans-serif;font-size:13px;color:#222;max-width:900px;margin:0 auto }
-        .pr-title { text-align:center;font-size:22px;font-weight:900;letter-spacing:6px;padding:18px 0 14px }
-        .pr-top { display:grid;grid-template-columns:1fr 1fr;gap:0;border-top:1.5px solid #333 }
-        .pr-info-table { border-collapse:collapse;width:100% }
-        .pr-info-table th { background:#f5f5f5;border:1px solid #ccc;padding:5px 10px;font-size:12px;font-weight:700;white-space:nowrap;width:100px }
-        .pr-info-table td { border:1px solid #ccc;padding:5px 10px;font-size:13px }
-        .pr-sign-table { border-collapse:collapse;width:100%;height:100% }
-        .pr-sign-table th { border:1px solid #ccc;padding:4px 6px;font-size:11px;text-align:center;background:#f5f5f5 }
-        .pr-sign-table td { border:1px solid #ccc;padding:4px 6px;font-size:11px;text-align:center;min-width:55px;height:50px;vertical-align:middle }
-        .pr-body-table { border-collapse:collapse;width:100%;margin-top:10px }
-        .pr-body-table th { background:#e6e8eb;border:1px solid #ccc;padding:6px 6px;font-size:12px;font-weight:700;text-align:center }
-        .pr-item-table { border-collapse:collapse;width:100%;margin-top:4px }
-        .pr-item-table th { background:#e6e8eb;border:1px solid #ccc;padding:5px 4px;font-size:11px;font-weight:700;text-align:center }
-      </style>
-      <div class="pr-doc">
-        <div class="pr-title">구 매 요 청 서</div>
+    const signCells = approvalLine.map((s,i) => {
+      const isDone = s.status === "승인";
+      const isCurr = i === (a.currentStep||0) && a.status === "진행중";
+      let inner = "";
+      if (isDone) {
+        inner = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%">'
+          + '<div style="border:2px solid #c00;border-radius:50%;padding:2px 6px;color:#c00;font-weight:800;font-size:12px">승인</div>'
+          + '<div style="font-size:10px;color:#555;margin-top:2px">' + escHtml(s.name) + '</div>'
+          + '<div style="font-size:10px;color:#888">' + (s.actionDate||"").slice(0,10) + '</div>'
+          + '</div>';
+      } else if (isCurr) {
+        inner = '<div style="text-align:center;color:#1e40af;font-size:11px;font-weight:700">⏳대기<br>' + escHtml(s.name) + '</div>';
+      } else {
+        inner = '<div style="text-align:center;color:#aaa;font-size:11px">' + escHtml(s.name) + '</div>';
+      }
+      return '<td style="border:1px solid #ccc;padding:4px 6px;min-width:55px;height:55px;vertical-align:middle">' + inner + '</td>';
+    }).join("") || '<td style="border:1px solid #ccc;min-width:55px;height:55px"></td>';
 
-        <div class="pr-top">
-          <!-- 좌: 기안자 정보 -->
-          <div style="border-right:1px solid #ccc">
-            <table class="pr-info-table">
-              <tr><th>기안자</th><td>\${escHtml(drafter)}</td></tr>
-              <tr><th>소속</th><td>\${escHtml(dept)}</td></tr>
-              <tr><th>기안일</th><td>\${escHtml(reqDate)}</td></tr>
-              <tr><th>문서번호</th><td>\${escHtml(a.id)}</td></tr>
-            </table>
-          </div>
-          <!-- 우: 결재란 -->
-          <div>
-            <table class="pr-sign-table">
-              <thead>
-                <tr>
-                  \${(a.approvalLine||[]).map(s => \`<th>\${escHtml(s.rank||s.role||"결재")}</th>\`).join("")}
-                  \${(a.approvalLine||[]).length === 0 ? "<th>결재</th>" : ""}
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  \${(a.approvalLine||[]).map((s,i) => {
-                    const isDone = s.status === "승인";
-                    const isCurr = i === (a.currentStep||0) && a.status === "진행중";
-                    return \`<td style="position:relative">
-                      \${isDone ? \`<div style="position:absolute;inset:2px;display:flex;align-items:center;justify-content:center;flex-direction:column">
-                        <div style="border:2px solid #c00;border-radius:50%;padding:2px 6px;color:#c00;font-weight:800;font-size:13px">승인</div>
-                        <div style="font-size:10px;color:#555;margin-top:2px">\${escHtml(s.name)}</div>
-                        <div style="font-size:10px;color:#888">\${(s.actionDate||"").slice(0,10)}</div>
-                      </div>\` : isCurr ? \`<div style="text-align:center;color:#1e40af;font-weight:700;font-size:11px">⏳대기<br>\${escHtml(s.name)}</div>\` : \`<div style="text-align:center;color:#aaa;font-size:11px">\${escHtml(s.name)}</div>\`}
-                    </td>\`;
-                  }).join("")}
-                  \${(a.approvalLine||[]).length === 0 ? "<td></td>" : ""}
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
+    // 품목 행
+    const itemRows = items.length > 0 ? items.map((it, i) => {
+      return '<tr>'
+        + '<td style="text-align:center;border:1px solid #ccc;padding:5px 4px;vertical-align:middle" rowspan="2">' + (i+1) + '</td>'
+        + '<td style="border:1px solid #ccc;padding:4px 8px">' + escHtml(it.name||it.partName||"-") + '</td>'
+        + '<td style="border:1px solid #ccc;padding:4px 8px;font-size:11px">' + escHtml(it.partno||it.partNo||"") + '</td>'
+        + '<td style="border:1px solid #ccc;padding:4px 8px;font-size:11px">' + escHtml(it.spec||"") + '</td>'
+        + '<td style="text-align:center;border:1px solid #ccc;padding:4px">' + escHtml(it.unit||"EA") + '</td>'
+        + '<td style="text-align:center;border:1px solid #ccc;padding:4px;font-size:11px">' + escHtml(it.dueDate||d.dueDate||"") + '</td>'
+        + '</tr><tr>'
+        + '<td style="border:1px solid #ccc;padding:4px 8px;font-size:11px;color:#666">' + escHtml(it.projectName||projCode||"") + '</td>'
+        + '<td style="border:1px solid #ccc;padding:4px 8px;font-size:11px"></td>'
+        + '<td style="border:1px solid #ccc;padding:4px 8px;font-size:11px">' + escHtml(it.supplier||it.vendor||it.maker||"") + '</td>'
+        + '<td style="text-align:right;border:1px solid #ccc;padding:4px 8px;font-weight:700">' + (parseFloat(it.qty)||0) + '</td>'
+        + '<td style="border:1px solid #ccc;padding:4px 8px;font-size:11px">' + escHtml(it.maker||"") + '</td>'
+        + '</tr>';
+    }).join("")
+    : '<tr><td colspan="11" style="text-align:center;padding:12px;color:#999;border:1px solid #ccc">품목 없음</td></tr>';
 
-        <!-- 본문 -->
-        <table class="pr-body-table" style="margin-top:0">
-          <tr>
-            <th style="width:120px">요청번호</th><td>\${escHtml(reqNo)}</td>
-            <th style="width:80px">요청일</th><td>\${escHtml(reqDate)}</td>
-          </tr>
-          <tr>
-            <th>요청부서</th><td>\${escHtml(dept)}</td>
-            <th>요청담당자</th><td>\${escHtml(drafter)}</td>
-          </tr>
-          <tr>
-            <th>구매요청구분</th><td>\${escHtml(reqType)}</td>
-            <th>총수량</th><td>\${totalQty.toLocaleString()}</td>
-          </tr>
-          <tr>
-            <th>특이사항</th><td colspan="3">\${escHtml(note)}</td>
-          </tr>
-        </table>
+    return '<div style="font-family:\'Malgun Gothic\',\'맑은 고딕\',sans-serif;font-size:13px;color:#222;max-width:900px;margin:0 auto">'
 
-        <!-- 품목 테이블 -->
-        <table class="pr-item-table" style="margin-top:8px">
-          <thead>
-            <tr>
-              <th rowspan="2" style="width:36px">No</th>
-              <th style="min-width:140px">품명</th>
-              <th style="min-width:100px">품번</th>
-              <th style="min-width:100px">규격</th>
-              <th style="width:50px">단위</th>
-              <th style="width:90px">납기요청일</th>
-            </tr>
-            <tr>
-              <th>프로젝트명</th>
-              <th>프로젝트번호</th>
-              <th>구매거래처</th>
-              <th>수량</th>
-              <th>제조사</th>
-            </tr>
-          </thead>
-          <tbody>\${itemRows}</tbody>
-          <tfoot>
-            <tr>
-              <th colspan="5" style="border:1px solid #ccc;padding:5px 8px;text-align:center">합계</th>
-              <td colspan="5" style="border:1px solid #ccc;padding:5px 8px;text-align:right;font-weight:800">\${totalQty.toLocaleString()}</td>
-              <td style="border:1px solid #ccc"></td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-    \`;
+      // 제목
+      + '<div style="text-align:center;font-size:22px;font-weight:900;letter-spacing:6px;padding:18px 0 14px">구 매 요 청 서</div>'
+
+      // 상단 2컬럼 (기안자 / 결재란)
+      + '<div style="display:grid;grid-template-columns:1fr auto;gap:0;border-top:1.5px solid #333">'
+        + '<div style="border-right:1px solid #ccc">'
+          + '<table style="border-collapse:collapse;width:100%">'
+            + '<tr><th style="background:#f5f5f5;border:1px solid #ccc;padding:5px 10px;font-size:12px;font-weight:700;width:90px">기안자</th><td style="border:1px solid #ccc;padding:5px 10px">' + escHtml(drafter) + '</td></tr>'
+            + '<tr><th style="background:#f5f5f5;border:1px solid #ccc;padding:5px 10px;font-size:12px;font-weight:700">소속</th><td style="border:1px solid #ccc;padding:5px 10px">' + escHtml(dept) + '</td></tr>'
+            + '<tr><th style="background:#f5f5f5;border:1px solid #ccc;padding:5px 10px;font-size:12px;font-weight:700">기안일</th><td style="border:1px solid #ccc;padding:5px 10px">' + escHtml(reqDate) + '</td></tr>'
+            + '<tr><th style="background:#f5f5f5;border:1px solid #ccc;padding:5px 10px;font-size:12px;font-weight:700">문서번호</th><td style="border:1px solid #ccc;padding:5px 10px;font-size:11px">' + escHtml(a.id) + '</td></tr>'
+          + '</table>'
+        + '</div>'
+        + '<div>'
+          + '<table style="border-collapse:collapse;height:100%">'
+            + '<thead><tr>' + signHeaders + '</tr></thead>'
+            + '<tbody><tr>' + signCells + '</tr></tbody>'
+          + '</table>'
+        + '</div>'
+      + '</div>'
+
+      // 본문 정보
+      + '<table style="border-collapse:collapse;width:100%;margin-top:0">'
+        + '<tr><th style="background:#e6e8eb;border:1px solid #ccc;padding:6px 10px;font-size:12px;width:110px">요청번호</th><td style="border:1px solid #ccc;padding:6px 10px">' + escHtml(reqNo) + '</td><th style="background:#e6e8eb;border:1px solid #ccc;padding:6px 10px;font-size:12px;width:80px">요청일</th><td style="border:1px solid #ccc;padding:6px 10px">' + escHtml(reqDate) + '</td></tr>'
+        + '<tr><th style="background:#e6e8eb;border:1px solid #ccc;padding:6px 10px;font-size:12px">요청부서</th><td style="border:1px solid #ccc;padding:6px 10px">' + escHtml(dept) + '</td><th style="background:#e6e8eb;border:1px solid #ccc;padding:6px 10px;font-size:12px">요청담당자</th><td style="border:1px solid #ccc;padding:6px 10px">' + escHtml(drafter) + '</td></tr>'
+        + '<tr><th style="background:#e6e8eb;border:1px solid #ccc;padding:6px 10px;font-size:12px">구매요청구분</th><td style="border:1px solid #ccc;padding:6px 10px">' + escHtml(reqType) + '</td><th style="background:#e6e8eb;border:1px solid #ccc;padding:6px 10px;font-size:12px">총수량</th><td style="border:1px solid #ccc;padding:6px 10px;font-weight:700">' + totalQty.toLocaleString() + '</td></tr>'
+        + '<tr><th style="background:#e6e8eb;border:1px solid #ccc;padding:6px 10px;font-size:12px">특이사항</th><td colspan="3" style="border:1px solid #ccc;padding:6px 10px">' + escHtml(note) + '</td></tr>'
+      + '</table>'
+
+      // 품목 테이블
+      + '<table style="border-collapse:collapse;width:100%;margin-top:8px;font-size:12px">'
+        + '<thead>'
+          + '<tr>'
+            + '<th rowspan="2" style="background:#e6e8eb;border:1px solid #ccc;padding:5px 4px;text-align:center;width:36px">No</th>'
+            + '<th style="background:#e6e8eb;border:1px solid #ccc;padding:5px 6px;min-width:140px">품명</th>'
+            + '<th style="background:#e6e8eb;border:1px solid #ccc;padding:5px 6px;min-width:90px">품번</th>'
+            + '<th style="background:#e6e8eb;border:1px solid #ccc;padding:5px 6px;min-width:90px">규격</th>'
+            + '<th style="background:#e6e8eb;border:1px solid #ccc;padding:5px 4px;width:45px">단위</th>'
+            + '<th style="background:#e6e8eb;border:1px solid #ccc;padding:5px 6px;width:88px">납기요청일</th>'
+          + '</tr>'
+          + '<tr>'
+            + '<th style="background:#e6e8eb;border:1px solid #ccc;padding:5px 6px">프로젝트명</th>'
+            + '<th style="background:#e6e8eb;border:1px solid #ccc;padding:5px 6px">프로젝트번호</th>'
+            + '<th style="background:#e6e8eb;border:1px solid #ccc;padding:5px 6px">구매거래처</th>'
+            + '<th style="background:#e6e8eb;border:1px solid #ccc;padding:5px 4px;text-align:center">수량</th>'
+            + '<th style="background:#e6e8eb;border:1px solid #ccc;padding:5px 6px">제조사</th>'
+          + '</tr>'
+        + '</thead>'
+        + '<tbody>' + itemRows + '</tbody>'
+        + '<tfoot><tr>'
+          + '<th colspan="5" style="background:#e6e8eb;border:1px solid #ccc;padding:5px 8px;text-align:center">합계</th>'
+          + '<td style="border:1px solid #ccc;padding:5px 8px;text-align:right;font-weight:800">' + totalQty.toLocaleString() + '</td>'
+          + '<td colspan="5" style="border:1px solid #ccc"></td>'
+        + '</tr></tfoot>'
+      + '</table>'
+    + '</div>';
   } else if (a.formId === "QUOTE_APPROVAL") {
     return `
       <div class="row2">
